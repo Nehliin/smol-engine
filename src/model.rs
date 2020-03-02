@@ -27,7 +27,7 @@ impl Model {
         model
     }
 
-    pub unsafe fn draw(&self, shader: &Shader) {
+    pub unsafe fn draw(&self, shader: &mut Shader) {
         self.meshes.iter().for_each(|mesh| {
             mesh.draw(shader);
         });

@@ -35,7 +35,7 @@ fn main() {
         .create_window(
             SRC_WIDHT,
             SRC_HEIGHT,
-            "Open GL tutorial",
+            "Smol-Engine",
             glfw::WindowMode::Windowed,
         )
         .expect("Failed to create window");
@@ -47,7 +47,7 @@ fn main() {
     window.set_framebuffer_size_polling(true);
 
     gl::load_with(|symbol| window.get_proc_address(symbol) as *const _);
-    let shader_program =
+    let mut shader_program =
         Shader::new("src/vertex_shader.shader", "src/fragment_shader.shader").unwrap();
 
     let light_positions = vec![
@@ -121,7 +121,7 @@ fn main() {
             );
 
             shader_program.set_float(&CString::new("material.shininess").unwrap(), 32.0);
-            lighting.set_uniforms(&shader_program);
+            lighting.set_uniforms(&mut shader_program);
             shader_program.set_mat4(&CString::new("projection").unwrap(), &projection_matrix);
             shader_program.set_mat4(&CString::new("view").unwrap(), &camera.get_view_matrix());
 
@@ -129,7 +129,7 @@ fn main() {
             let mut model = Matrix4::<f32>::from_translation(vec3(0.0, -1.75, 0.0)); // translate it down so it's at the center of the scene
             model = model * Matrix4::from_scale(0.2); // it's a bit too big for our scene, so scale it down
             shader_program.set_mat4(c_str!("model"), &model);
-            nano_suite_model.draw(&shader_program);
+            nano_suite_model.draw(&mut shader_program);
 
             lighting.draw(&projection_matrix, &camera.get_view_matrix());
         }

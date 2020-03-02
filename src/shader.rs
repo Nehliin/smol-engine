@@ -32,7 +32,7 @@ pub struct Shader {
 #[allow(dead_code)]
 impl Shader {
     pub fn new(vertex_shader_path: &str, fragment_shader_path: &str) -> Result<Self, String> {
-        let shader = Shader {
+        let mut shader = Shader {
             id: unsafe { gl::CreateProgram() },
         };
         let mut vertex_shader_file = File::open(vertex_shader_path)
@@ -68,25 +68,25 @@ impl Shader {
         Ok(shader)
     }
 
-    pub unsafe fn use_program(&self) {
+    pub unsafe fn use_program(&mut self) {
         gl::UseProgram(self.id);
     }
 
     /// utility uniform functions
     /// ------------------------------------------------------------------------
-    pub unsafe fn set_bool(&self, name: &CStr, value: bool) {
+    pub unsafe fn set_bool(&mut self, name: &CStr, value: bool) {
         gl::Uniform1i(gl::GetUniformLocation(self.id, name.as_ptr()), value as i32);
     }
     /// ------------------------------------------------------------------------
-    pub unsafe fn set_int(&self, name: &CStr, value: i32) {
+    pub unsafe fn set_int(&mut self, name: &CStr, value: i32) {
         gl::Uniform1i(gl::GetUniformLocation(self.id, name.as_ptr()), value);
     }
     /// ------------------------------------------------------------------------
-    pub unsafe fn set_float(&self, name: &CStr, value: f32) {
+    pub unsafe fn set_float(&mut self, name: &CStr, value: f32) {
         gl::Uniform1f(gl::GetUniformLocation(self.id, name.as_ptr()), value);
     }
     /// ------------------------------------------------------------------------
-    pub unsafe fn set_vector3(&self, name: &CStr, value: &Vector3<f32>) {
+    pub unsafe fn set_vector3(&mut self, name: &CStr, value: &Vector3<f32>) {
         gl::Uniform3fv(
             gl::GetUniformLocation(self.id, name.as_ptr()),
             1,
@@ -94,11 +94,11 @@ impl Shader {
         );
     }
     /// ------------------------------------------------------------------------
-    pub unsafe fn set_vec3(&self, name: &CStr, x: f32, y: f32, z: f32) {
+    pub unsafe fn set_vec3(&mut self, name: &CStr, x: f32, y: f32, z: f32) {
         gl::Uniform3f(gl::GetUniformLocation(self.id, name.as_ptr()), x, y, z);
     }
 
-    pub unsafe fn set_vector4(&self, name: &CStr, value: &Vector4<f32>) {
+    pub unsafe fn set_vector4(&mut self, name: &CStr, value: &Vector4<f32>) {
         gl::Uniform4fv(
             gl::GetUniformLocation(self.id, name.as_ptr()),
             1,
@@ -106,11 +106,11 @@ impl Shader {
         );
     }
     /// ------------------------------------------------------------------------
-    pub unsafe fn set_vec4(&self, name: &CStr, x: f32, y: f32, z: f32, w: f32) {
+    pub unsafe fn set_vec4(&mut self, name: &CStr, x: f32, y: f32, z: f32, w: f32) {
         gl::Uniform4f(gl::GetUniformLocation(self.id, name.as_ptr()), x, y, z, w);
     }
     /// ------------------------------------------------------------------------
-    pub unsafe fn set_mat4(&self, name: &CStr, mat: &Matrix4<f32>) {
+    pub unsafe fn set_mat4(&mut self, name: &CStr, mat: &Matrix4<f32>) {
         gl::UniformMatrix4fv(
             gl::GetUniformLocation(self.id, name.as_ptr()),
             1,
@@ -120,7 +120,7 @@ impl Shader {
     }
 
     unsafe fn compile_shader(
-        &self,
+        &mut self,
         shader_type: GLenum,
         c_str_source: &CString,
     ) -> Result<GLuint, String> {
@@ -131,7 +131,11 @@ impl Shader {
         Ok(shader)
     }
 
-    unsafe fn check_compile_errors(&self, shader: u32, operation: Operation) -> Result<(), String> {
+    unsafe fn check_compile_errors(
+        &mut self,
+        shader: u32,
+        operation: Operation,
+    ) -> Result<(), String> {
         let mut success = gl::FALSE as GLint;
         let mut info_log = Vec::with_capacity(1024);
         info_log.set_len(1024); // subtract 1 to skip the trailing null character

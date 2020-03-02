@@ -86,7 +86,7 @@ impl Mesh {
     }
 
     /// render the mesh
-    pub unsafe fn draw(&self, shader: &Shader) {
+    pub unsafe fn draw(&self, shader: &mut Shader) {
         //  shader.use_program();
         // bind appropriate textures
         let mut diffuse_number = 0;

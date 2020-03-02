@@ -156,7 +156,7 @@ impl Lighting {
         self.spotlights.push(light);
     }
 
-    pub unsafe fn set_uniforms(&self, shader: &Shader) {
+    pub unsafe fn set_uniforms(&self, shader: &mut Shader) {
         shader.set_int(
             &CString::new("number_of_point_lights").unwrap(),
             self.point_lights.len() as i32,
@@ -264,7 +264,7 @@ impl Lighting {
         }
     }
 
-    pub unsafe fn draw(&self, projection_matrix: &Matrix4<f32>, view_matrix: &Matrix4<f32>) {
+    pub unsafe fn draw(&mut self, projection_matrix: &Matrix4<f32>, view_matrix: &Matrix4<f32>) {
         self.shader.use_program();
         gl::BindVertexArray(self.vertex_array_object);
         for light in self.point_lights.iter() {
