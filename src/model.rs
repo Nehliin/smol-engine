@@ -100,8 +100,12 @@ impl Model {
     }
 }
 
-unsafe fn texture_from_file(path: &str, directory: &str) -> u32 {
-    let filename = format!("{}/{}", directory, path);
+pub unsafe fn texture_from_file(path: &str, directory: &str) -> u32 {
+    let filename = if !directory.is_empty() {
+        format!("{}/{}", directory, path)
+    } else {
+        path.to_string()
+    };
 
     let mut texture_id = 0;
     gl::GenTextures(1, &mut texture_id);

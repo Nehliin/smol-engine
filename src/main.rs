@@ -1,3 +1,4 @@
+use cgmath::Vector3;
 use cgmath::{vec3, Deg};
 use cgmath::{Matrix4, Point3};
 use glfw::{Action, Context, Key};
@@ -9,18 +10,29 @@ const SRC_WIDHT: u32 = 1600;
 const SRC_HEIGHT: u32 = 1200;
 
 mod camera;
+mod cube;
 mod lighting;
-mod macros;
+pub mod macros;
 mod mesh;
 mod model;
 mod shader;
 
+use crate::cube::Cube;
 use camera::Camera;
 use lighting::directional_light::DirectionalLight;
 use lighting::point_light::PointLight;
+use lighting::spotlight::SpotLight;
 use lighting::Lighting;
 use model::Model;
 use shader::Shader;
+
+#[global_allocator]
+static GLOBAL: jemallocator::Jemalloc = jemallocator::Jemalloc;
+
+#[inline]
+fn to_vec(point: &Point3<f32>) -> Vector3<f32> {
+    Vector3::new(point.x, point.y, point.z)
+}
 
 fn main() {
     let mut glfw = glfw::init(glfw::FAIL_ON_ERRORS).unwrap();
@@ -60,13 +72,15 @@ fn main() {
         gl::Enable(gl::DEPTH_TEST);
     }
     let mut lighting = Lighting::new();
-    lighting.set_directional_light(
+    /*lighting.set_directional_light(
         DirectionalLight::default()
             .set_diffuse(vec3(0.0, 1.0, 0.0))
             .set_direction(vec3(-0.2, -1.0, -0.3)),
-    );
+    );*/
     light_positions.iter().for_each(|light_pos| {
-        lighting.add_point_light(PointLight::default().set_position(*light_pos));
+        lighting
+            .point_lights
+            .push(PointLight::default().set_position(*light_pos));
     });
 
     let nano_suite_model = Model::new("nanosuit/nanosuit.obj");
@@ -75,9 +89,14 @@ fn main() {
     let mut camera = Camera::new(Point3::new(0., 0., 3.), vec3(0., 0., -1.));
     let projection_matrix =
         cgmath::perspective(Deg(45.0), SRC_WIDHT as f32 / SRC_HEIGHT as f32, 0.1, 100.0);
-    //let test = CString::new("offset").unwrap();
+
+    lighting.spotlights.push(
+        SpotLight::default()
+            .set_position(to_vec(&camera.get_position()))
+            .set_direction(camera.get_direction()),
+    );
     //let light_position = vec3(1.2, 1.0, 2.0);
-    /* let cube_positions = vec![
+    let cube_positions = vec![
         vec3(0.0, 0.0, 0.0),
         vec3(2.0, 5.0, -15.0),
         vec3(-1.5, -2.2, -2.5),
@@ -88,7 +107,12 @@ fn main() {
         vec3(1.5, 2.0, -2.5),
         vec3(1.5, 0.2, -1.5),
         vec3(-1.3, 1.0, -1.5),
-    ];*/
+    ];
+    let cubes = cube_positions
+        .iter()
+        .map(|pos| Cube::new().set_position(*pos))
+        .collect::<Vec<Cube>>();
+
     let mut first_mouse = true;
     let mut last_x = (SRC_WIDHT / 2) as f32;
     let mut last_y = (SRC_HEIGHT / 2) as f32;
@@ -105,6 +129,9 @@ fn main() {
             &mut last_y,
         );
         process_input(&mut window, &mut camera, delta_time);
+
+        lighting.spotlights[0].direction = camera.get_direction();
+        lighting.spotlights[0].position = to_vec(&camera.get_position());
 
         unsafe {
             gl::ClearColor(0.2, 0.3, 0.3, 1.0);
@@ -130,6 +157,12 @@ fn main() {
             model = model * Matrix4::from_scale(0.2); // it's a bit too big for our scene, so scale it down
             shader_program.set_mat4(c_str!("model"), &model);
             nano_suite_model.draw(&mut shader_program);
+
+            for cube in cubes.iter() {
+                let model = Matrix4::<f32>::from_translation(cube.position);
+                shader_program.set_mat4(c_str!("model"), &model);
+                cube.draw(&mut shader_program);
+            }
 
             lighting.draw(&projection_matrix, &camera.get_view_matrix());
         }

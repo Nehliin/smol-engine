@@ -1,5 +1,6 @@
 #![allow(dead_code)]
 
+use crate::cube::VERTICIES;
 use crate::lighting::directional_light::DirectionalLight;
 use crate::lighting::spotlight::SpotLight;
 use crate::shader::Shader;
@@ -7,57 +8,11 @@ use cgmath::Matrix4;
 use core::ffi::c_void;
 use gl::types::*;
 use point_light::PointLight;
-use std::ffi::CString;
+use std::ffi::CString; // TODO: Ska ej hämtas här
 
 pub mod directional_light;
 pub mod point_light;
 pub mod spotlight;
-
-#[rustfmt::skip]
-const VERTICIES: [f32; 288] = [
-    // positions          // normals           // texture coords
-    -0.5, -0.5, -0.5,  0.0,  0.0, -1.0,  0.0, 0.0,
-    0.5, -0.5, -0.5,  0.0,  0.0, -1.0,  1.0, 0.0,
-    0.5,  0.5, -0.5,  0.0,  0.0, -1.0,  1.0, 1.0,
-    0.5,  0.5, -0.5,  0.0,  0.0, -1.0,  1.0, 1.0,
-    -0.5,  0.5, -0.5,  0.0,  0.0, -1.0,  0.0, 1.0,
-    -0.5, -0.5, -0.5,  0.0,  0.0, -1.0,  0.0, 0.0,
-
-    -0.5, -0.5,  0.5,  0.0,  0.0, 1.0,   0.0, 0.0,
-    0.5, -0.5,  0.5,  0.0,  0.0, 1.0,   1.0, 0.0,
-    0.5,  0.5,  0.5,  0.0,  0.0, 1.0,   1.0, 1.0,
-    0.5,  0.5,  0.5,  0.0,  0.0, 1.0,   1.0, 1.0,
-    -0.5,  0.5,  0.5,  0.0,  0.0, 1.0,   0.0, 1.0,
-    -0.5, -0.5,  0.5,  0.0,  0.0, 1.0,   0.0, 0.0,
-
-    -0.5,  0.5,  0.5, -1.0,  0.0,  0.0,  1.0, 0.0,
-    -0.5,  0.5, -0.5, -1.0,  0.0,  0.0,  1.0, 1.0,
-    -0.5, -0.5, -0.5, -1.0,  0.0,  0.0,  0.0, 1.0,
-    -0.5, -0.5, -0.5, -1.0,  0.0,  0.0,  0.0, 1.0,
-    -0.5, -0.5,  0.5, -1.0,  0.0,  0.0,  0.0, 0.0,
-    -0.5,  0.5,  0.5, -1.0,  0.0,  0.0,  1.0, 0.0,
-
-    0.5,  0.5,  0.5,  1.0,  0.0,  0.0,  1.0, 0.0,
-    0.5,  0.5, -0.5,  1.0,  0.0,  0.0,  1.0, 1.0,
-    0.5, -0.5, -0.5,  1.0,  0.0,  0.0,  0.0, 1.0,
-    0.5, -0.5, -0.5,  1.0,  0.0,  0.0,  0.0, 1.0,
-    0.5, -0.5,  0.5,  1.0,  0.0,  0.0,  0.0, 0.0,
-    0.5,  0.5,  0.5,  1.0,  0.0,  0.0,  1.0, 0.0,
-
-    -0.5, -0.5, -0.5,  0.0, -1.0,  0.0,  0.0, 1.0,
-    0.5, -0.5, -0.5,  0.0, -1.0,  0.0,  1.0, 1.0,
-    0.5, -0.5,  0.5,  0.0, -1.0,  0.0,  1.0, 0.0,
-    0.5, -0.5,  0.5,  0.0, -1.0,  0.0,  1.0, 0.0,
-    -0.5, -0.5,  0.5,  0.0, -1.0,  0.0,  0.0, 0.0,
-    -0.5, -0.5, -0.5,  0.0, -1.0,  0.0,  0.0, 1.0,
-
-    -0.5,  0.5, -0.5,  0.0,  1.0,  0.0,  0.0, 1.0,
-    0.5,  0.5, -0.5,  0.0,  1.0,  0.0,  1.0, 1.0,
-    0.5,  0.5,  0.5,  0.0,  1.0,  0.0,  1.0, 0.0,
-    0.5,  0.5,  0.5,  0.0,  1.0,  0.0,  1.0, 0.0,
-    -0.5,  0.5,  0.5,  0.0,  1.0,  0.0,  0.0, 0.0,
-    -0.5,  0.5, -0.5,  0.0,  1.0,  0.0,  0.0, 1.0
-];
 
 pub enum Strength {
     Weak,
@@ -67,20 +22,20 @@ pub enum Strength {
     Strong,
 }
 
-fn get_strength(strength: Strength) -> (f32, f32) {
-    match strength {
-        Strength::Weak => (0.22, 0.2),
-        Strength::Medium => (0.09, 0.032),
-        Strength::Strong => (0.045, 0.0075),
+impl Strength {
+    pub fn get_values(&self) -> (f32, f32) {
+        match self {
+            Strength::Weak => (0.22, 0.2),
+            Strength::Medium => (0.09, 0.032),
+            Strength::Strong => (0.045, 0.0075),
+        }
     }
 }
 
-// Generell light struktur här där man kan lägga till directional, spotlights och point lights
-// gör builders till de inviduella typerna, ha ett draw call här som renderar alla
 pub struct Lighting {
     directional_light: Option<DirectionalLight>,
-    point_lights: Vec<PointLight>,
-    spotlights: Vec<SpotLight>,
+    pub point_lights: Vec<PointLight>,
+    pub spotlights: Vec<SpotLight>,
 
     shader: Shader,
 
@@ -146,14 +101,6 @@ impl Lighting {
 
     pub fn set_directional_light(&mut self, light: DirectionalLight) {
         self.directional_light = Some(light);
-    }
-
-    pub fn add_point_light(&mut self, light: PointLight) {
-        self.point_lights.push(light);
-    }
-
-    pub fn add_spotlight(&mut self, light: SpotLight) {
-        self.spotlights.push(light);
     }
 
     pub unsafe fn set_uniforms(&self, shader: &mut Shader) {
@@ -263,7 +210,7 @@ impl Lighting {
             );
         }
     }
-
+    // TODO: This should not be here! decouple cube and light!
     pub unsafe fn draw(&mut self, projection_matrix: &Matrix4<f32>, view_matrix: &Matrix4<f32>) {
         self.shader.use_program();
         gl::BindVertexArray(self.vertex_array_object);
@@ -277,16 +224,16 @@ impl Lighting {
                 .set_mat4(&CString::new("model").unwrap(), &model_matrix);
             gl::DrawArrays(gl::TRIANGLES, 0, 36);
         }
-        for light in self.spotlights.iter() {
-            self.shader
-                .set_mat4(&CString::new("projection").unwrap(), &projection_matrix);
-            self.shader
-                .set_mat4(&CString::new("view").unwrap(), &view_matrix);
-            let model_matrix = Matrix4::from_translation(light.position) * Matrix4::from_scale(0.2);
-            self.shader
-                .set_mat4(&CString::new("model").unwrap(), &model_matrix);
-            gl::DrawArrays(gl::TRIANGLES, 0, 36);
-        }
+        // for light in self.spotlights.iter() {
+        //     self.shader
+        //         .set_mat4(&CString::new("projection").unwrap(), &projection_matrix);
+        //     self.shader
+        //         .set_mat4(&CString::new("view").unwrap(), &view_matrix);
+        //     let model_matrix = Matrix4::from_translation(light.position) * Matrix4::from_scale(0.2);
+        //     self.shader
+        //         .set_mat4(&CString::new("model").unwrap(), &model_matrix);
+        //     gl::DrawArrays(gl::TRIANGLES, 0, 36);
+        // }
         gl::BindVertexArray(0);
     }
 }

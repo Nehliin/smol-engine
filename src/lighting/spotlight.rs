@@ -1,13 +1,12 @@
 #![allow(dead_code)]
 
-use crate::lighting::get_strength;
 use crate::lighting::Strength;
 use cgmath::vec3;
 use cgmath::Vector3;
 
 pub struct SpotLight {
-    pub(super) direction: Vector3<f32>,
-    pub(super) position: Vector3<f32>,
+    pub direction: Vector3<f32>,
+    pub position: Vector3<f32>,
     pub(super) ambient: Vector3<f32>,
     pub(super) specular: Vector3<f32>,
     pub(super) diffuse: Vector3<f32>,
@@ -35,8 +34,8 @@ impl Default for SpotLight {
             constant,
             linear,
             quadratic,
-            cutoff: 12.5_f32.to_radians(),
-            outer_cutoff: 15.5_f32.to_radians(),
+            cutoff: 12.5_f32.to_radians().cos(),
+            outer_cutoff: 15.5_f32.to_radians().cos(),
         }
     }
 }
@@ -77,7 +76,7 @@ impl SpotLight {
     }
 
     pub fn set_strength(mut self, strength: Strength) -> Self {
-        let (linear, quadratic) = get_strength(strength);
+        let (linear, quadratic) = strength.get_values();
         self.linear = linear;
         self.quadratic = quadratic;
         self

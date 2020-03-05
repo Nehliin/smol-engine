@@ -1,6 +1,5 @@
 #![allow(dead_code)]
 
-use crate::lighting::get_strength;
 use crate::lighting::Strength;
 use cgmath::vec3;
 use cgmath::Vector3;
@@ -55,7 +54,7 @@ impl PointLight {
     }
 
     pub fn set_strength(mut self, strength: Strength) -> Self {
-        let (linear, quadratic) = get_strength(strength);
+        let (linear, quadratic) = strength.get_values();
         self.linear = linear;
         self.quadratic = quadratic;
         self
