@@ -1,7 +1,7 @@
 use cgmath::Vector3;
 use cgmath::{vec3, Deg};
 use cgmath::{Matrix4, Point3};
-use glfw::{Action, Context, Key};
+use glfw::{Action, Context, Glfw, Key};
 
 use std::ffi::CString;
 use std::sync::mpsc::Receiver;
@@ -10,14 +10,13 @@ const SRC_WIDHT: u32 = 1600;
 const SRC_HEIGHT: u32 = 1200;
 
 mod camera;
-mod cube;
+//mod cube;
 mod lighting;
 pub mod macros;
 mod mesh;
 mod model;
 mod shader;
 
-use crate::cube::Cube;
 use camera::Camera;
 use lighting::directional_light::DirectionalLight;
 use lighting::point_light::PointLight;
@@ -26,6 +25,16 @@ use lighting::Lighting;
 use model::Model;
 use shader::Shader;
 
+use legion::prelude::*;
+
+use crate::lighting::{LightColor, PointLightTag, SpotLightTag, Strength};
+use std::borrow::BorrowMut;
+
+pub struct Transform {
+    pub position: Vector3<f32>,
+    pub scale: Vector3<f32>,
+}
+
 #[global_allocator]
 static GLOBAL: jemallocator::Jemalloc = jemallocator::Jemalloc;
 
@@ -33,6 +42,70 @@ static GLOBAL: jemallocator::Jemalloc = jemallocator::Jemalloc;
 fn to_vec(point: &Point3<f32>) -> Vector3<f32> {
     Vector3::new(point.x, point.y, point.z)
 }
+// shader trait render is a method???? camera is a resource
+unsafe fn render(shader: &mut Shader, camera: &Camera, world: &mut World) {
+    shader.use_program();
+    shader.set_vector3(
+        &CString::new("viewPos").unwrap(),
+        &to_vec(&camera.get_position()),
+    );
+    shader.set_mat4(
+        &CString::new("projection").unwrap(),
+        &camera.get_projection_matrix(),
+    );
+    shader.set_mat4(&CString::new("view").unwrap(), &camera.get_view_matrix());
+    //shader.set_uniforms(&mut world);// ^---- alla light uniforms måste sättas här
+    let query = <(Read<Transform>, Read<PointLight>)>::query().filter(tag::<Light>());
+    let mut light_count = 0;
+    for (i, (transform, point_light)) in query.iter(world).enumerate() {
+        point_light.set_uniforms(shader, i, &transform);
+        light_count += 1;
+    }
+    shader.set_int(
+        &CString::new("number_of_point_lights").unwrap(),
+        light_count,
+    );
+    //let query = <Read<DirectionalLight>>::query().filter(tag::<Light>());
+    //if let Some(directional_light) = query.iter(world).next() {
+    //  directional_light.set_uniforms(&mut shader);
+    //}
+
+    let query = <(Read<Transform>, Read<Model>)>::query().filter(!tag::<Light>());
+    for (transform, model) in query.iter(world) {
+        let transform_matrix = Matrix4::from_translation(transform.position)
+            * Matrix4::from_nonuniform_scale(
+                transform.scale.x,
+                transform.scale.y,
+                transform.scale.z,
+            );
+        shader.set_mat4(&CString::new("model").unwrap(), &transform_matrix);
+        model.draw(shader);
+    }
+}
+
+unsafe fn render_lights(shader: &mut Shader, camera: &Camera, world: &mut World) {
+    shader.use_program();
+    shader.set_mat4(
+        &CString::new("projection").unwrap(),
+        &camera.get_projection_matrix(),
+    );
+    shader.set_mat4(&CString::new("view").unwrap(), &camera.get_view_matrix());
+    let query = <(Read<Transform>, Read<Model>)>::query().filter(tag::<Light>());
+    for (transform, model) in query.iter(world) {
+        let transform_matrix = Matrix4::from_translation(transform.position)
+            * Matrix4::from_nonuniform_scale(
+                transform.scale.x,
+                transform.scale.y,
+                transform.scale.z,
+            );
+
+        shader.set_mat4(&CString::new("model").unwrap(), &transform_matrix);
+        model.draw(shader);
+    }
+}
+
+#[derive(Clone, Copy, Debug, PartialEq)]
+struct Light;
 
 fn main() {
     let mut glfw = glfw::init(glfw::FAIL_ON_ERRORS).unwrap();
@@ -59,8 +132,28 @@ fn main() {
     window.set_framebuffer_size_polling(true);
 
     gl::load_with(|symbol| window.get_proc_address(symbol) as *const _);
-    let mut shader_program =
-        Shader::new("src/vertex_shader.shader", "src/fragment_shader.shader").unwrap();
+    unsafe {
+        gl::Enable(gl::DEPTH_TEST);
+    }
+    let universe = Universe::new();
+    let mut world = universe.create_world();
+    let mut light_shader = Shader::new(
+        "src/light_vertex_shader.shader",
+        "src/light_fragment_shader.shader",
+    )
+    .expect("Failed to create light shaders");
+    let mut shader = Shader::new("src/vertex_shader.shader", "src/fragment_shader.shader").unwrap();
+    let mut camera = Camera::new(Point3::new(0., 0., 3.), vec3(0., 0., -1.));
+    world.insert(
+        (),
+        vec![(
+            Transform {
+                position: vec3(0.0, -1.75, 0.0),
+                scale: vec3(0.2, 0.2, 0.2),
+            },
+            Model::new("nanosuit/nanosuit.obj"),
+        )],
+    );
 
     let light_positions = vec![
         vec3(0.7, 0.2, 2.0),
@@ -68,34 +161,21 @@ fn main() {
         vec3(-4.0, 2.0, -12.0),
         vec3(0.0, 0.0, -3.0),
     ];
-    unsafe {
-        gl::Enable(gl::DEPTH_TEST);
-    }
-    let mut lighting = Lighting::new();
-    /*lighting.set_directional_light(
-        DirectionalLight::default()
-            .set_diffuse(vec3(0.0, 1.0, 0.0))
-            .set_direction(vec3(-0.2, -1.0, -0.3)),
-    );*/
-    light_positions.iter().for_each(|light_pos| {
-        lighting
-            .point_lights
-            .push(PointLight::default().set_position(*light_pos));
-    });
-
-    let nano_suite_model = Model::new("nanosuit/nanosuit.obj");
-
-    //let model_matrix = Matrix4::from_angle_x(Deg(-55.0)); //* Matrix::identity();
-    let mut camera = Camera::new(Point3::new(0., 0., 3.), vec3(0., 0., -1.));
-    let projection_matrix =
-        cgmath::perspective(Deg(45.0), SRC_WIDHT as f32 / SRC_HEIGHT as f32, 0.1, 100.0);
-
-    lighting.spotlights.push(
-        SpotLight::default()
-            .set_position(to_vec(&camera.get_position()))
-            .set_direction(camera.get_direction()),
+    //world.insert((DirectionalLight), vec![(Direction(), LightColor::default())]);
+    //world.insert((SpotLightTag), vec![(Transform::default(), LightColor::default(), Strength::Medium, CutOff::default())]);
+    world.insert(
+        (Light, ()), // <--- maybe shader tag here?
+        light_positions.iter().map(|&position| {
+            (
+                Transform {
+                    position,
+                    scale: vec3(0.5, 0.5, 0.5),
+                },
+                Model::cube(),
+                PointLight::default(),
+            )
+        }),
     );
-    //let light_position = vec3(1.2, 1.0, 2.0);
     let cube_positions = vec![
         vec3(0.0, 0.0, 0.0),
         vec3(2.0, 5.0, -15.0),
@@ -108,19 +188,40 @@ fn main() {
         vec3(1.5, 0.2, -1.5),
         vec3(-1.3, 1.0, -1.5),
     ];
-    let cubes = cube_positions
-        .iter()
-        .map(|pos| Cube::new().set_position(*pos))
-        .collect::<Vec<Cube>>();
+
+    world.insert(
+        (),
+        cube_positions.iter().map(|&position| {
+            (
+                Model::cube(),
+                Transform {
+                    position,
+                    scale: vec3(1.0, 1.0, 1.0),
+                },
+            )
+        }),
+    );
+
+    //let mut lighting = Lighting::new();
+
+    //light_positions.iter().for_each(|light_pos| {
+    //  lighting
+    //    .point_lights
+    //  .push(PointLight::default().set_position(*light_pos));
+    //});
 
     let mut first_mouse = true;
     let mut last_x = (SRC_WIDHT / 2) as f32;
     let mut last_y = (SRC_HEIGHT / 2) as f32;
     let mut last_frame = 0.0;
+
     while !window.should_close() {
         let current_frame = glfw.get_time() as f32;
         let delta_time = current_frame - last_frame;
         last_frame = current_frame;
+
+        //  let mut camera = resources.get_mut::<Camera>().unwrap();
+
         process_events(
             &events,
             &mut camera,
@@ -130,48 +231,52 @@ fn main() {
         );
         process_input(&mut window, &mut camera, delta_time);
 
-        lighting.spotlights[0].direction = camera.get_direction();
-        lighting.spotlights[0].position = to_vec(&camera.get_position());
-
         unsafe {
             gl::ClearColor(0.2, 0.3, 0.3, 1.0);
             gl::Clear(gl::COLOR_BUFFER_BIT | gl::DEPTH_BUFFER_BIT);
+            render(&mut shader, &camera, &mut world);
+            render_lights(&mut light_shader, &camera, &mut world);
+            //shader.use_program();
 
-            // let time = glfw.get_time() as f32;
+            //lighting.set_uniforms(&mut shader);
 
-            shader_program.use_program();
-            shader_program.set_vec3(
-                &CString::new("viewPos").unwrap(),
-                camera.get_position().x,
-                camera.get_position().y,
-                camera.get_position().z,
-            );
-
-            shader_program.set_float(&CString::new("material.shininess").unwrap(), 32.0);
-            lighting.set_uniforms(&mut shader_program);
-            shader_program.set_mat4(&CString::new("projection").unwrap(), &projection_matrix);
-            shader_program.set_mat4(&CString::new("view").unwrap(), &camera.get_view_matrix());
-
-            //    shader_program.set_float(&test, time.sin());
-            let mut model = Matrix4::<f32>::from_translation(vec3(0.0, -1.75, 0.0)); // translate it down so it's at the center of the scene
-            model = model * Matrix4::from_scale(0.2); // it's a bit too big for our scene, so scale it down
-            shader_program.set_mat4(c_str!("model"), &model);
-            nano_suite_model.draw(&mut shader_program);
-
-            for cube in cubes.iter() {
-                let model = Matrix4::<f32>::from_translation(cube.position);
-                shader_program.set_mat4(c_str!("model"), &model);
-                cube.draw(&mut shader_program);
-            }
-
-            lighting.draw(&projection_matrix, &camera.get_view_matrix());
+            //lighting.draw(&camera.get_projection_matrix(), &camera.get_view_matrix());
         }
+        //schedule.execute(&mut world, &mut resources);
         window.swap_buffers();
         glfw.poll_events();
     }
 }
 
-const CAMERA_SPEED: f32 = 2.5;
+/**
+    1. create render function using esc and querying
+    shaders are resources
+    Components:
+    Strenght,
+    Colours (ambient, diffuse, specular),
+    position,
+    direction,
+    (mesh),
+
+    log är en feature flag
+
+    queries:
+    en för varje ljus?
+    tag är ljus typ
+    // set uniforms
+    format!(tag.tostring, [index], colour.ambient ...)
+
+    set rätt uniforms
+    rendrera
+
+
+    shaders are resources
+    model = component
+    transforms = component
+
+**/
+
+const CAMERA_SPEED: f32 = 4.5;
 
 fn process_input(window: &mut glfw::Window, camera: &mut Camera, delta_time: f32) {
     if window.get_key(Key::Escape) == Action::Press {
@@ -187,11 +292,11 @@ fn process_input(window: &mut glfw::Window, camera: &mut Camera, delta_time: f32
     }
 
     if window.get_key(Key::A) == Action::Press {
-        camera.move_sidways(-CAMERA_SPEED * delta_time);
+        camera.move_sideways(-CAMERA_SPEED * delta_time);
     }
 
     if window.get_key(Key::D) == Action::Press {
-        camera.move_sidways(CAMERA_SPEED * delta_time);
+        camera.move_sideways(CAMERA_SPEED * delta_time);
     }
 }
 

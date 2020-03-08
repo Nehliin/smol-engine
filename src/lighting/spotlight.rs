@@ -76,7 +76,8 @@ impl SpotLight {
     }
 
     pub fn set_strength(mut self, strength: Strength) -> Self {
-        let (linear, quadratic) = strength.get_values();
+        let (constant, linear, quadratic) = strength.get_values();
+        self.constant = constant;
         self.linear = linear;
         self.quadratic = quadratic;
         self

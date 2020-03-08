@@ -1,56 +1,10 @@
-use crate::mesh::Texture;
-use crate::model::texture_from_file;
+use crate::mesh::{Texture, Vertex, Mesh};
+use crate::model::{texture_from_file, Model};
 use crate::shader::Shader;
-use cgmath::{vec3, Vector3, Zero};
+use cgmath::{vec2, vec3, Vector3, Zero};
 use gl::types::*;
-use glfw::ffi::glfwSetWindowMaximizeCallback;
 use std::ffi::{c_void, CStr, CString};
 
-#[rustfmt::skip]
-pub const VERTICIES: [f32; 288] = [
-    // positions          // normals           // texture coords
-    -0.5, -0.5, -0.5,  0.0,  0.0, -1.0,  0.0, 0.0,
-    0.5, -0.5, -0.5,  0.0,  0.0, -1.0,  1.0, 0.0,
-    0.5,  0.5, -0.5,  0.0,  0.0, -1.0,  1.0, 1.0,
-    0.5,  0.5, -0.5,  0.0,  0.0, -1.0,  1.0, 1.0,
-    -0.5,  0.5, -0.5,  0.0,  0.0, -1.0,  0.0, 1.0,
-    -0.5, -0.5, -0.5,  0.0,  0.0, -1.0,  0.0, 0.0,
-
-    -0.5, -0.5,  0.5,  0.0,  0.0, 1.0,   0.0, 0.0,
-    0.5, -0.5,  0.5,  0.0,  0.0, 1.0,   1.0, 0.0,
-    0.5,  0.5,  0.5,  0.0,  0.0, 1.0,   1.0, 1.0,
-    0.5,  0.5,  0.5,  0.0,  0.0, 1.0,   1.0, 1.0,
-    -0.5,  0.5,  0.5,  0.0,  0.0, 1.0,   0.0, 1.0,
-    -0.5, -0.5,  0.5,  0.0,  0.0, 1.0,   0.0, 0.0,
-
-    -0.5,  0.5,  0.5, -1.0,  0.0,  0.0,  1.0, 0.0,
-    -0.5,  0.5, -0.5, -1.0,  0.0,  0.0,  1.0, 1.0,
-    -0.5, -0.5, -0.5, -1.0,  0.0,  0.0,  0.0, 1.0,
-    -0.5, -0.5, -0.5, -1.0,  0.0,  0.0,  0.0, 1.0,
-    -0.5, -0.5,  0.5, -1.0,  0.0,  0.0,  0.0, 0.0,
-    -0.5,  0.5,  0.5, -1.0,  0.0,  0.0,  1.0, 0.0,
-
-    0.5,  0.5,  0.5,  1.0,  0.0,  0.0,  1.0, 0.0,
-    0.5,  0.5, -0.5,  1.0,  0.0,  0.0,  1.0, 1.0,
-    0.5, -0.5, -0.5,  1.0,  0.0,  0.0,  0.0, 1.0,
-    0.5, -0.5, -0.5,  1.0,  0.0,  0.0,  0.0, 1.0,
-    0.5, -0.5,  0.5,  1.0,  0.0,  0.0,  0.0, 0.0,
-    0.5,  0.5,  0.5,  1.0,  0.0,  0.0,  1.0, 0.0,
-
-    -0.5, -0.5, -0.5,  0.0, -1.0,  0.0,  0.0, 1.0,
-    0.5, -0.5, -0.5,  0.0, -1.0,  0.0,  1.0, 1.0,
-    0.5, -0.5,  0.5,  0.0, -1.0,  0.0,  1.0, 0.0,
-    0.5, -0.5,  0.5,  0.0, -1.0,  0.0,  1.0, 0.0,
-    -0.5, -0.5,  0.5,  0.0, -1.0,  0.0,  0.0, 0.0,
-    -0.5, -0.5, -0.5,  0.0, -1.0,  0.0,  0.0, 1.0,
-
-    -0.5,  0.5, -0.5,  0.0,  1.0,  0.0,  0.0, 1.0,
-    0.5,  0.5, -0.5,  0.0,  1.0,  0.0,  1.0, 1.0,
-    0.5,  0.5,  0.5,  0.0,  1.0,  0.0,  1.0, 0.0,
-    0.5,  0.5,  0.5,  0.0,  1.0,  0.0,  1.0, 0.0,
-    -0.5,  0.5,  0.5,  0.0,  1.0,  0.0,  0.0, 0.0,
-    -0.5,  0.5, -0.5,  0.0,  1.0,  0.0,  0.0, 1.0
-];
 
 pub struct Cube {
     pub position: Vector3<f32>,
@@ -62,11 +16,10 @@ pub struct Cube {
     vertex_array_buffer: u32,
 }
 
-const diffuse_texture: &str = "container2.png";
-const specular_texture: &str = "container2_specular.png";
+
 
 impl Cube {
-    pub fn new() -> Self {
+    pub fn new() -> Model {
         let texture_diffuse = Texture {
             id: unsafe { texture_from_file(diffuse_texture, "") },
             type_str: "diffuse_textures".to_string(),
@@ -79,7 +32,17 @@ impl Cube {
             path: specular_texture.to_string(),
         };
 
-        let mut cube = Cube {
+        let verticies = VERTICIES
+            .chunks_exact(8)
+            .map(|chunk| Vertex {
+                position: vec3(chunk[0], chunk[1], chunk[2]),
+                normal: vec3(chunk[3], chunk[4], chunk[5]),
+                tex_coords: vec2(chunk[6], chunk[7]),
+            })
+            .collect();
+        let mesh = Mesh::new_unindexed(verticies, vec![texture_diffuse, texture_specular]);
+        Model::from_meshes(vec![mesh]);
+        /*let mut cube = Cube {
             position: Vector3::zero(),
             texture_diffuse,
             texture_specular,
@@ -90,7 +53,7 @@ impl Cube {
         unsafe {
             cube.set_up_cube();
         }
-        cube
+        cube*/
     }
 
     unsafe fn set_up_cube(&mut self) {

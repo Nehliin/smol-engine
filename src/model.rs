@@ -9,6 +9,56 @@ use image::DynamicImage::*;
 use image::GenericImage;
 use std::path::Path;
 
+// trash structure
+#[rustfmt::skip]
+pub const VERTICIES: [f32; 288] = [
+    // positions          // normals           // texture coords
+    -0.5, -0.5, -0.5,  0.0,  0.0, -1.0,  0.0, 0.0,
+    0.5, -0.5, -0.5,  0.0,  0.0, -1.0,  1.0, 0.0,
+    0.5,  0.5, -0.5,  0.0,  0.0, -1.0,  1.0, 1.0,
+    0.5,  0.5, -0.5,  0.0,  0.0, -1.0,  1.0, 1.0,
+    -0.5,  0.5, -0.5,  0.0,  0.0, -1.0,  0.0, 1.0,
+    -0.5, -0.5, -0.5,  0.0,  0.0, -1.0,  0.0, 0.0,
+
+    -0.5, -0.5,  0.5,  0.0,  0.0, 1.0,   0.0, 0.0,
+    0.5, -0.5,  0.5,  0.0,  0.0, 1.0,   1.0, 0.0,
+    0.5,  0.5,  0.5,  0.0,  0.0, 1.0,   1.0, 1.0,
+    0.5,  0.5,  0.5,  0.0,  0.0, 1.0,   1.0, 1.0,
+    -0.5,  0.5,  0.5,  0.0,  0.0, 1.0,   0.0, 1.0,
+    -0.5, -0.5,  0.5,  0.0,  0.0, 1.0,   0.0, 0.0,
+
+    -0.5,  0.5,  0.5, -1.0,  0.0,  0.0,  1.0, 0.0,
+    -0.5,  0.5, -0.5, -1.0,  0.0,  0.0,  1.0, 1.0,
+    -0.5, -0.5, -0.5, -1.0,  0.0,  0.0,  0.0, 1.0,
+    -0.5, -0.5, -0.5, -1.0,  0.0,  0.0,  0.0, 1.0,
+    -0.5, -0.5,  0.5, -1.0,  0.0,  0.0,  0.0, 0.0,
+    -0.5,  0.5,  0.5, -1.0,  0.0,  0.0,  1.0, 0.0,
+
+    0.5,  0.5,  0.5,  1.0,  0.0,  0.0,  1.0, 0.0,
+    0.5,  0.5, -0.5,  1.0,  0.0,  0.0,  1.0, 1.0,
+    0.5, -0.5, -0.5,  1.0,  0.0,  0.0,  0.0, 1.0,
+    0.5, -0.5, -0.5,  1.0,  0.0,  0.0,  0.0, 1.0,
+    0.5, -0.5,  0.5,  1.0,  0.0,  0.0,  0.0, 0.0,
+    0.5,  0.5,  0.5,  1.0,  0.0,  0.0,  1.0, 0.0,
+
+    -0.5, -0.5, -0.5,  0.0, -1.0,  0.0,  0.0, 1.0,
+    0.5, -0.5, -0.5,  0.0, -1.0,  0.0,  1.0, 1.0,
+    0.5, -0.5,  0.5,  0.0, -1.0,  0.0,  1.0, 0.0,
+    0.5, -0.5,  0.5,  0.0, -1.0,  0.0,  1.0, 0.0,
+    -0.5, -0.5,  0.5,  0.0, -1.0,  0.0,  0.0, 0.0,
+    -0.5, -0.5, -0.5,  0.0, -1.0,  0.0,  0.0, 1.0,
+
+    -0.5,  0.5, -0.5,  0.0,  1.0,  0.0,  0.0, 1.0,
+    0.5,  0.5, -0.5,  0.0,  1.0,  0.0,  1.0, 1.0,
+    0.5,  0.5,  0.5,  0.0,  1.0,  0.0,  1.0, 0.0,
+    0.5,  0.5,  0.5,  0.0,  1.0,  0.0,  1.0, 0.0,
+    -0.5,  0.5,  0.5,  0.0,  1.0,  0.0,  0.0, 0.0,
+    -0.5,  0.5, -0.5,  0.0,  1.0,  0.0,  0.0, 1.0
+];
+
+const diffuse_texture: &str = "container2.png";
+const specular_texture: &str = "container2_specular.png";
+
 pub struct Model {
     meshes: Vec<Mesh>,
     directory: String,
@@ -24,6 +74,36 @@ impl Model {
         };
 
         model.load(path);
+        model
+    }
+
+    pub fn cube() -> Self {
+        let texture_diffuse = Texture {
+            id: unsafe { texture_from_file(diffuse_texture, "") },
+            type_str: "diffuse_textures".to_string(),
+            path: diffuse_texture.to_string(),
+        };
+
+        let texture_specular = Texture {
+            id: unsafe { texture_from_file(specular_texture, "") },
+            type_str: "specular_textures".to_string(),
+            path: specular_texture.to_string(),
+        };
+
+        let verticies = VERTICIES
+            .chunks_exact(8)
+            .map(|chunk| Vertex {
+                position: vec3(chunk[0], chunk[1], chunk[2]),
+                normal: vec3(chunk[3], chunk[4], chunk[5]),
+                tex_coords: vec2(chunk[6], chunk[7]),
+            })
+            .collect();
+        let mesh = Mesh::new_unindexed(verticies, vec![texture_diffuse, texture_specular]);
+        let mut model = Model {
+            meshes: vec![mesh],
+            directory: String::new(),
+            textures_loaded: Vec::new(),
+        };
         model
     }
 
@@ -79,7 +159,8 @@ impl Model {
                 }
             }
 
-            self.meshes.push(Mesh::new(vertices, indices, textures));
+            self.meshes
+                .push(Mesh::new_indexed(vertices, indices, textures));
         });
     }
 

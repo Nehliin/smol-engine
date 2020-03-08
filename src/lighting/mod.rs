@@ -1,10 +1,10 @@
 #![allow(dead_code)]
 
-use crate::cube::VERTICIES;
 use crate::lighting::directional_light::DirectionalLight;
 use crate::lighting::spotlight::SpotLight;
+use crate::model::VERTICIES;
 use crate::shader::Shader;
-use cgmath::Matrix4;
+use cgmath::{vec3, Matrix4, Vector3};
 use core::ffi::c_void;
 use gl::types::*;
 use point_light::PointLight;
@@ -23,11 +23,30 @@ pub enum Strength {
 }
 
 impl Strength {
-    pub fn get_values(&self) -> (f32, f32) {
+    pub fn get_values(&self) -> (f32, f32, f32) {
         match self {
-            Strength::Weak => (0.22, 0.2),
-            Strength::Medium => (0.09, 0.032),
-            Strength::Strong => (0.045, 0.0075),
+            Strength::Weak => (1.0, 0.22, 0.2),
+            Strength::Medium => (1.0, 0.09, 0.032),
+            Strength::Strong => (1.0, 0.045, 0.0075),
+        }
+    }
+}
+
+pub struct PointLightTag;
+pub struct SpotLightTag;
+
+pub struct LightColor {
+    pub ambient: Vector3<f32>,
+    pub diffuse: Vector3<f32>,
+    pub specular: Vector3<f32>,
+}
+
+impl Default for LightColor {
+    fn default() -> Self {
+        LightColor {
+            ambient: vec3(0.1, 0.1, 0.1),
+            diffuse: vec3(1.0, 1.0, 1.0),
+            specular: vec3(1.0, 1.0, 1.0),
         }
     }
 }

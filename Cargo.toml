@@ -1,5 +1,5 @@
 [package]
-name = "learn-gl"
+name = "smol-engine"
 version = "0.1.0"
 authors = ["oskarn <oskarn@spotify.com>"]
 edition = "2018"
@@ -24,3 +24,4 @@ gl = "0.14"
 glfw = "0.36"
 image = "0.19"
 tobj = "0.1.12"
+legion = {git = "https://github.com/TomGillen/legion.git"}
