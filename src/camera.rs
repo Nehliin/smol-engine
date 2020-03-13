@@ -1,6 +1,5 @@
 #![allow(dead_code)]
 
-use crate::{SRC_HEIGHT, SRC_WIDHT};
 use cgmath::prelude::*;
 use cgmath::{vec3, Vector3};
 use cgmath::{Deg, Rad};
@@ -18,7 +17,7 @@ pub struct Camera {
 }
 
 impl Camera {
-    pub fn new(position: Point3<f32>, direction: Vector3<f32>) -> Self {
+    pub fn new(position: Point3<f32>, direction: Vector3<f32>, window_width: u32, window_height: u32) -> Self {
         // what POINT should the camera look at?
         let view_target = position + direction;
         Camera {
@@ -27,7 +26,7 @@ impl Camera {
             view_matrix: Matrix4::look_at(position, view_target, UP),
             projection_matrix: cgmath::perspective(
                 Deg(45.0),
-                SRC_WIDHT as f32 / SRC_HEIGHT as f32,
+                window_width as f32 / window_height as f32,
                 0.1,
                 100.0,
             ),

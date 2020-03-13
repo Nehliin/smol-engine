@@ -99,12 +99,11 @@ impl Model {
             })
             .collect();
         let mesh = Mesh::new_unindexed(verticies, vec![texture_diffuse, texture_specular]);
-        let mut model = Model {
+        Model {
             meshes: vec![mesh],
             directory: String::new(),
             textures_loaded: Vec::new(),
-        };
-        model
+        }
     }
 
     pub unsafe fn draw(&self, shader: &mut Shader) {
