@@ -1,4 +1,4 @@
-use cgmath::{Point3, Vector4};
+use cgmath::{Array, Vector4};
 use gl::types::*;
 use std::ffi::CStr;
 use std::ffi::CString;
@@ -6,13 +6,10 @@ use std::fs::File;
 use std::io::Read as IoRead;
 
 use crate::camera::Camera;
+use crate::components::{LightTag, Transform};
 use crate::lighting::directional_light::DirectionalLight;
 use crate::lighting::point_light::PointLight;
 use crate::model::Model;
-use crate::state::Light; // very wrong
-use crate::to_vec;
-use crate::Transform;
-use cgmath::prelude::*;
 use cgmath::{Matrix, Matrix4, Vector3};
 use legion::prelude::*;
 
@@ -51,7 +48,8 @@ impl ShaderSys for LightShader {
             .write_resource::<LightShader>()
             .read_resource::<Camera>()
             .with_query(
-                <(Read<Transform>, Read<Model>, Read<PointLight>)>::query().filter(tag::<Light>()),
+                <(Read<Transform>, Read<Model>, Read<PointLight>)>::query()
+                    .filter(tag::<LightTag>()),
             )
             .build(|_, world, (shader, camera), model_query| unsafe {
                 shader.0.use_program();
@@ -85,14 +83,14 @@ impl ShaderSys for ModelShader {
         SystemBuilder::new("Model ShaderSystem")
             .write_resource::<ModelShader>() //TODO: EN samlad resurs med alla shaders istället??
             .read_resource::<Camera>()
-            .with_query(<(Read<Transform>, Read<Model>)>::query().filter(!tag::<Light>()))
-            .with_query(<(Read<Transform>, Read<PointLight>)>::query().filter(tag::<Light>()))
+            .with_query(<(Read<Transform>, Read<Model>)>::query().filter(!tag::<LightTag>()))
+            .with_query(<(Read<Transform>, Read<PointLight>)>::query().filter(tag::<LightTag>()))
             .build(
                 |_, world, (shader, camera), (model_query, uniform_query)| unsafe {
                     shader.0.use_program();
                     shader.0.set_vector3(
                         &CString::new("viewPos").unwrap(),
-                        &to_vec(&camera.get_position()),
+                        &camera.get_vec_position(),
                     );
                     shader.0.set_mat4(
                         &CString::new("projection").unwrap(),

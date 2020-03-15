@@ -56,8 +56,8 @@ pub const VERTICIES: [f32; 288] = [
     -0.5,  0.5, -0.5,  0.0,  1.0,  0.0,  0.0, 1.0
 ];
 
-const diffuse_texture: &str = "container2.png";
-const specular_texture: &str = "container2_specular.png";
+const DIFFUSE_TEXTURE: &str = "container2.png";
+const SPECULAR_TEXTURE: &str = "container2_specular.png";
 
 pub struct Model {
     meshes: Vec<Mesh>,
@@ -79,15 +79,15 @@ impl Model {
 
     pub fn cube() -> Self {
         let texture_diffuse = Texture {
-            id: unsafe { texture_from_file(diffuse_texture, "") },
+            id: unsafe { texture_from_file(DIFFUSE_TEXTURE, "") },
             type_str: "diffuse_textures".to_string(),
-            path: diffuse_texture.to_string(),
+            path: DIFFUSE_TEXTURE.to_string(),
         };
 
         let texture_specular = Texture {
-            id: unsafe { texture_from_file(specular_texture, "") },
+            id: unsafe { texture_from_file(SPECULAR_TEXTURE, "") },
             type_str: "specular_textures".to_string(),
-            path: specular_texture.to_string(),
+            path: SPECULAR_TEXTURE.to_string(),
         };
 
         let verticies = VERTICIES

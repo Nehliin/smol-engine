@@ -16,8 +16,18 @@ pub struct Camera {
     yaw: f32,
 }
 
+#[inline]
+fn to_vec(point: &Point3<f32>) -> Vector3<f32> {
+    Vector3::new(point.x, point.y, point.z)
+}
+
 impl Camera {
-    pub fn new(position: Point3<f32>, direction: Vector3<f32>, window_width: u32, window_height: u32) -> Self {
+    pub fn new(
+        position: Point3<f32>,
+        direction: Vector3<f32>,
+        window_width: u32,
+        window_height: u32,
+    ) -> Self {
         // what POINT should the camera look at?
         let view_target = position + direction;
         Camera {
@@ -44,6 +54,11 @@ impl Camera {
     #[inline]
     pub fn get_position(&self) -> Point3<f32> {
         self.position
+    }
+
+    #[inline]
+    pub fn get_vec_position(&self) -> Vector3<f32> {
+        to_vec(&self.position)
     }
 
     #[inline]

@@ -1,8 +1,8 @@
 use crate::camera::Camera;
+use crate::components::{LightTag, Transform};
 use crate::engine::{InputEvent, Time, WINDOW_HEIGHT, WINDOW_WIDTH};
 use crate::lighting::point_light::PointLight;
 use crate::model::Model;
-use crate::Transform;
 use cgmath::vec3;
 use glfw::{Action, Key};
 use legion::prelude::*;
@@ -41,8 +41,6 @@ impl BasicState {
     }
 }
 const CAMERA_SPEED: f32 = 4.5;
-#[derive(Clone, Copy, Debug, PartialEq)]
-pub struct Light;
 
 impl State for BasicState {
     fn start(&mut self, world: &mut World, resources: &mut Resources) {
@@ -65,7 +63,7 @@ impl State for BasicState {
         );
 
         world.insert(
-            (Light, ()), // <--- maybe shader tag here?
+            (LightTag, ()), // <--- maybe shader tag here?
             light_positions.iter().map(|&position| {
                 (
                     Transform {
