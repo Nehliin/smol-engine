@@ -57,6 +57,8 @@ impl State for BasicState {
                 Transform {
                     position: vec3(0.0, -1.75, 0.0),
                     scale: vec3(0.2, 0.2, 0.2),
+                    rotation: vec3(1.0, 1.0, 1.0),
+                    angle: 0.0,
                 },
                 Model::new("nanosuit/nanosuit.obj"),
             )],
@@ -69,6 +71,8 @@ impl State for BasicState {
                     Transform {
                         position,
                         scale: vec3(0.5, 0.5, 0.5),
+                        rotation: vec3(1.0, 1.0, 1.0),
+                        angle: 0.0,
                     },
                     Model::cube(),
                     PointLight::default(),
@@ -97,10 +101,22 @@ impl State for BasicState {
                     Transform {
                         position,
                         scale: vec3(1.0, 1.0, 1.0),
+                        rotation: vec3(1.0, 1.0, 1.0),
+                        angle: 0.0,
                     },
                 )
             }),
         );
+
+        let floor = Model::cube();
+        let floor_transform = Transform {
+            position: vec3(0.0, -5.0, -2.0),
+            scale: vec3(0.1, 10.0, 10.0),
+            rotation: vec3(0.0, 0.0, 1.0),
+            angle: 90_f32,
+        };
+
+        world.insert((), vec![(floor, floor_transform)]);
     }
 
     fn update(&mut self, world: &mut World, resources: &mut Resources) {}

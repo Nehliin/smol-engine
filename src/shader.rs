@@ -1,3 +1,5 @@
+use cgmath::prelude::*;
+use cgmath::Rad;
 use cgmath::{Array, Vector4};
 use gl::types::*;
 use std::ffi::CStr;
@@ -118,6 +120,10 @@ impl ShaderSys for ModelShader {
                     //let query = <(Read<Transform>, Read<Model>)>::query().filter(!tag::<Light>());
                     for (transform, model) in model_query.iter(world) {
                         let transform_matrix = Matrix4::from_translation(transform.position)
+                            * Matrix4::from_axis_angle(
+                                transform.rotation.normalize(),
+                                Rad(transform.angle.to_radians()),
+                            )
                             * Matrix4::from_nonuniform_scale(
                                 transform.scale.x,
                                 transform.scale.y,
