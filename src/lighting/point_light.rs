@@ -2,7 +2,7 @@
 
 use crate::components::Transform;
 use crate::lighting::Strength;
-use crate::shader::Shader;
+use crate::shaders::Shader;
 use cgmath::vec3;
 use cgmath::Vector3;
 use std::ffi::CString;

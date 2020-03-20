@@ -1,4 +1,4 @@
-use crate::shader::{LightShader, ModelShader, Shader, ShaderSys};
+use crate::shaders::{LightShader, ModelShader, OutLineShader, Shader, ShaderSys};
 use legion::prelude::{Resources, Schedulable, World};
 
 pub trait Renderer {
@@ -31,10 +31,17 @@ impl Renderer for BasicRenderer {
             )
             .expect("Failed to create Light shader"),
         );
-        self.shader_systems.push(ModelShader::get_system());
+        let outline_shader = OutLineShader(
+            Shader::new("src/light_vertex_shader.shader", "src/outline_frag.shader")
+                .expect("Failed to create OutLineShader"),
+        );
         self.shader_systems.push(LightShader::get_system());
+        self.shader_systems.push(ModelShader::get_system());
+        self.shader_systems.push(OutLineShader::get_system());
+
         resources.insert(light_shader);
         resources.insert(shader);
+        resources.insert(outline_shader);
     }
 
     fn render_world(&mut self, world: &mut World, resources: &mut Resources) {

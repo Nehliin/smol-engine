@@ -1,19 +1,19 @@
 use cgmath::prelude::*;
-use cgmath::Rad;
-use cgmath::{Array, Vector4};
+use cgmath::{Array, Matrix4, Vector3, Vector4};
 use gl::types::*;
+use legion::prelude::*;
 use std::ffi::CStr;
 use std::ffi::CString;
 use std::fs::File;
 use std::io::Read as IoRead;
 
-use crate::camera::Camera;
-use crate::components::{LightTag, Transform};
-use crate::lighting::directional_light::DirectionalLight;
-use crate::lighting::point_light::PointLight;
-use crate::model::Model;
-use cgmath::{Matrix, Matrix4, Vector3};
-use legion::prelude::*;
+pub mod light_shader;
+pub mod model_shader;
+pub mod outline_shader;
+
+pub use light_shader::LightShader;
+pub use model_shader::ModelShader;
+pub use outline_shader::OutLineShader;
 
 #[derive(Debug, Clone, Copy)]
 enum Operation {
@@ -32,111 +32,13 @@ impl From<GLenum> for Operation {
     }
 }
 
-pub struct Shader {
-    pub id: GLuint,
-}
-
-//Temps
-
+//TODO: THIS IS UGLY AF
 pub trait ShaderSys {
     fn get_system() -> Box<dyn Schedulable>;
 }
 
-pub struct LightShader(pub Shader);
-
-impl ShaderSys for LightShader {
-    fn get_system() -> Box<dyn Schedulable> {
-        SystemBuilder::new("Light ShaderSystem")
-            .write_resource::<LightShader>()
-            .read_resource::<Camera>()
-            .with_query(
-                <(Read<Transform>, Read<Model>, Read<PointLight>)>::query()
-                    .filter(tag::<LightTag>()),
-            )
-            .build(|_, world, (shader, camera), model_query| unsafe {
-                shader.0.use_program();
-                shader.0.set_mat4(
-                    &CString::new("projection").unwrap(),
-                    &camera.get_projection_matrix(),
-                );
-                shader
-                    .0
-                    .set_mat4(&CString::new("view").unwrap(), &camera.get_view_matrix());
-                for (transform, model, _light) in model_query.iter(world) {
-                    let transform_matrix = Matrix4::from_translation(transform.position)
-                        * Matrix4::from_nonuniform_scale(
-                            transform.scale.x,
-                            transform.scale.y,
-                            transform.scale.z,
-                        );
-                    shader
-                        .0
-                        .set_mat4(&CString::new("model").unwrap(), &transform_matrix);
-                    model.draw(&mut shader.0);
-                }
-            })
-    }
-}
-
-pub struct ModelShader(pub Shader);
-
-impl ShaderSys for ModelShader {
-    fn get_system() -> Box<dyn Schedulable> {
-        SystemBuilder::new("Model ShaderSystem")
-            .write_resource::<ModelShader>() //TODO: EN samlad resurs med alla shaders istället??
-            .read_resource::<Camera>()
-            .with_query(<(Read<Transform>, Read<Model>)>::query().filter(!tag::<LightTag>()))
-            .with_query(<(Read<Transform>, Read<PointLight>)>::query().filter(tag::<LightTag>()))
-            .build(
-                |_, world, (shader, camera), (model_query, uniform_query)| unsafe {
-                    shader.0.use_program();
-                    shader.0.set_vector3(
-                        &CString::new("viewPos").unwrap(),
-                        &camera.get_vec_position(),
-                    );
-                    shader.0.set_mat4(
-                        &CString::new("projection").unwrap(),
-                        &camera.get_projection_matrix(),
-                    );
-                    shader
-                        .0
-                        .set_mat4(&CString::new("view").unwrap(), &camera.get_view_matrix());
-                    //shader.0.set_uniforms(&mut world);// ^---- alla light uniforms måste sättas här
-
-                    let mut light_count = 0;
-                    for (i, (transform, point_light)) in uniform_query.iter(world).enumerate() {
-                        point_light.set_uniforms(&mut shader.0, i, &transform);
-                        light_count += 1;
-                    }
-                    shader.0.set_int(
-                        &CString::new("number_of_point_lights").unwrap(),
-                        light_count,
-                    );
-                    //  let query = <Read<DirectionalLight>>::query().filter(tag::<Light>());
-                    //if let Some(directional_light) = query.iter(world).next() {
-                    //directional_light.set_uniforms(&mut shader.0);
-                    //}
-
-                    //let query = <(Read<Transform>, Read<Model>)>::query().filter(!tag::<Light>());
-                    for (transform, model) in model_query.iter(world) {
-                        let transform_matrix = Matrix4::from_translation(transform.position)
-                            * Matrix4::from_axis_angle(
-                                transform.rotation.normalize(),
-                                Rad(transform.angle.to_radians()),
-                            )
-                            * Matrix4::from_nonuniform_scale(
-                                transform.scale.x,
-                                transform.scale.y,
-                                transform.scale.z,
-                            );
-                        shader
-                            .0
-                            .set_mat4(&CString::new("model").unwrap(), &transform_matrix);
-                        model.draw(&mut shader.0);
-                    }
-                },
-            )
-    }
+pub struct Shader {
+    pub id: GLuint,
 }
 
 #[allow(dead_code)]

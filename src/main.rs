@@ -6,7 +6,7 @@ mod lighting;
 pub mod macros;
 mod mesh;
 mod model;
-mod shader;
+mod shaders;
 mod state;
 
 use crate::engine::Engine;
