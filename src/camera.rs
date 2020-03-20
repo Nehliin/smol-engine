@@ -1,8 +1,8 @@
 #![allow(dead_code)]
 
 use cgmath::prelude::*;
-use cgmath::Rad;
 use cgmath::{vec3, Vector3};
+use cgmath::{Deg, Rad};
 use cgmath::{Matrix4, Point3};
 
 const UP: Vector3<f32> = vec3(0., 1., 0.);
@@ -11,18 +11,35 @@ pub struct Camera {
     direction: Vector3<f32>,
     position: Point3<f32>,
     view_matrix: Matrix4<f32>,
+    projection_matrix: Matrix4<f32>,
     pitch: f32,
     yaw: f32,
 }
 
+#[inline]
+fn to_vec(point: &Point3<f32>) -> Vector3<f32> {
+    Vector3::new(point.x, point.y, point.z)
+}
+
 impl Camera {
-    pub fn new(position: Point3<f32>, direction: Vector3<f32>) -> Self {
+    pub fn new(
+        position: Point3<f32>,
+        direction: Vector3<f32>,
+        window_width: u32,
+        window_height: u32,
+    ) -> Self {
         // what POINT should the camera look at?
         let view_target = position + direction;
         Camera {
             direction,
             position,
             view_matrix: Matrix4::look_at(position, view_target, UP),
+            projection_matrix: cgmath::perspective(
+                Deg(45.0),
+                window_width as f32 / window_height as f32,
+                0.1,
+                100.0,
+            ),
             yaw: -90.0,
             pitch: 0.0,
         }
@@ -40,6 +57,11 @@ impl Camera {
     }
 
     #[inline]
+    pub fn get_vec_position(&self) -> Vector3<f32> {
+        to_vec(&self.position)
+    }
+
+    #[inline]
     pub fn get_direction(&self) -> Vector3<f32> {
         self.direction
     }
@@ -51,7 +73,7 @@ impl Camera {
     }
 
     #[inline]
-    pub fn move_sidways(&mut self, amount: f32) {
+    pub fn move_sideways(&mut self, amount: f32) {
         self.position += self.direction.cross(UP).normalize() * amount;
         self.view_matrix = Matrix4::look_at(self.position, self.position + self.direction, UP);
     }
@@ -59,6 +81,11 @@ impl Camera {
     #[inline]
     pub fn get_view_matrix(&self) -> &Matrix4<f32> {
         &self.view_matrix
+    }
+
+    #[inline]
+    pub fn get_projection_matrix(&self) -> &Matrix4<f32> {
+        &self.projection_matrix
     }
 
     #[inline]

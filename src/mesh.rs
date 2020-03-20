@@ -50,7 +50,7 @@ impl Drop for Texture {
 pub struct Mesh {
     /*  Mesh Data  */
     pub vertices: Vec<Vertex>,
-    pub indices: Vec<u32>,
+    pub indices: Option<Vec<u32>>,
     pub textures: Vec<Texture>,
     pub vertex_array_object: u32,
 
@@ -70,10 +70,10 @@ impl Drop for Mesh {
 }
 
 impl Mesh {
-    pub fn new(vertices: Vec<Vertex>, indices: Vec<u32>, textures: Vec<Texture>) -> Mesh {
+    pub fn new_indexed(vertices: Vec<Vertex>, indices: Vec<u32>, textures: Vec<Texture>) -> Mesh {
         let mut mesh = Mesh {
             vertices,
-            indices,
+            indices: Some(indices),
             textures,
             vertex_array_object: 0,
             vertex_array_buffer: 0,
@@ -81,6 +81,19 @@ impl Mesh {
         };
 
         // now that we have all the required data, set the vertex buffers and its attribute pointers.
+        unsafe { mesh.setup_mesh() }
+        mesh
+    }
+
+    pub fn new_unindexed(vertices: Vec<Vertex>, textures: Vec<Texture>) -> Mesh {
+        let mut mesh = Mesh {
+            vertices,
+            indices: None,
+            textures,
+            vertex_array_object: 0,
+            vertex_array_buffer: 0,
+            element_array_buffer: 0,
+        };
         unsafe { mesh.setup_mesh() }
         mesh
     }
@@ -116,17 +129,23 @@ impl Mesh {
             // and finally bind the texture
             gl::BindTexture(gl::TEXTURE_2D, texture.id);
         }
+        shader.set_float(&CString::new("material.shininess").unwrap(), 32.0);
         shader.set_int(c_str!("number_of_specular_textures"), specular_number);
         shader.set_int(c_str!("number_of_diffuse_textures"), diffuse_number);
 
         // draw mesh
         gl::BindVertexArray(self.vertex_array_object);
-        gl::DrawElements(
-            gl::TRIANGLES,
-            self.indices.len() as i32,
-            gl::UNSIGNED_INT,
-            std::ptr::null(),
-        );
+        if let Some(indices) = &self.indices {
+            gl::DrawElements(
+                gl::TRIANGLES,
+                indices.len() as i32,
+                gl::UNSIGNED_INT,
+                std::ptr::null(),
+            );
+        } else {
+            // TODO: HACK
+            gl::DrawArrays(gl::TRIANGLES, 0, 36);
+        }
         gl::BindVertexArray(0);
 
         // always good practice to set everything back to defaults once configured.
@@ -137,7 +156,9 @@ impl Mesh {
         // create buffers/arrays
         gl::GenVertexArrays(1, &mut self.vertex_array_object);
         gl::GenBuffers(1, &mut self.vertex_array_buffer);
-        gl::GenBuffers(1, &mut self.element_array_buffer);
+        if self.indices.is_some() {
+            gl::GenBuffers(1, &mut self.element_array_buffer);
+        }
 
         gl::BindVertexArray(self.vertex_array_object);
         // load data into vertex buffers
@@ -149,10 +170,12 @@ impl Mesh {
         let data = &self.vertices[0] as *const Vertex as *const c_void;
         gl::BufferData(gl::ARRAY_BUFFER, size, data, gl::STATIC_DRAW);
 
-        gl::BindBuffer(gl::ELEMENT_ARRAY_BUFFER, self.element_array_buffer);
-        let size = (self.indices.len() * std::mem::size_of::<u32>()) as isize;
-        let data = &self.indices[0] as *const u32 as *const c_void;
-        gl::BufferData(gl::ELEMENT_ARRAY_BUFFER, size, data, gl::STATIC_DRAW);
+        if let Some(indices) = &self.indices {
+            gl::BindBuffer(gl::ELEMENT_ARRAY_BUFFER, self.element_array_buffer);
+            let size = (indices.len() * std::mem::size_of::<u32>()) as isize;
+            let data = &indices[0] as *const u32 as *const c_void;
+            gl::BufferData(gl::ELEMENT_ARRAY_BUFFER, size, data, gl::STATIC_DRAW);
+        }
 
         // set the vertex attribute pointers
         let size = std::mem::size_of::<Vertex>() as i32;

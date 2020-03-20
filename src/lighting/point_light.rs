@@ -1,8 +1,11 @@
 #![allow(dead_code)]
 
+use crate::components::Transform;
 use crate::lighting::Strength;
+use crate::shader::Shader;
 use cgmath::vec3;
 use cgmath::Vector3;
+use std::ffi::CString;
 
 pub struct PointLight {
     pub(super) position: Vector3<f32>,
@@ -52,9 +55,42 @@ impl PointLight {
         self.diffuse = diffuse;
         self
     }
+    // get uniforms? och sen skicka in till shader istället?
+    pub unsafe fn set_uniforms(&self, shader: &mut Shader, i: usize, transform: &Transform) {
+        shader.set_float(
+            &CString::new(format!("pointLights[{}].constant", i)).unwrap(),
+            self.constant,
+        );
+        shader.set_float(
+            &CString::new(format!("pointLights[{}].quadratic", i)).unwrap(),
+            self.quadratic,
+        );
+        shader.set_float(
+            &CString::new(format!("pointLights[{}].linear", i)).unwrap(),
+            self.linear,
+        );
+
+        shader.set_vector3(
+            &CString::new(format!("pointLights[{}].ambient", i)).unwrap(),
+            &self.ambient,
+        );
+        shader.set_vector3(
+            &CString::new(format!("pointLights[{}].diffuse", i)).unwrap(),
+            &self.diffuse,
+        );
+        shader.set_vector3(
+            &CString::new(format!("pointLights[{}].specular", i)).unwrap(),
+            &self.specular,
+        );
+        shader.set_vector3(
+            &CString::new(format!("pointLights[{}].position", i)).unwrap(),
+            &transform.position,
+        );
+    }
 
     pub fn set_strength(mut self, strength: Strength) -> Self {
-        let (linear, quadratic) = strength.get_values();
+        let (constant, linear, quadratic) = strength.get_values();
+        self.constant = constant;
         self.linear = linear;
         self.quadratic = quadratic;
         self
