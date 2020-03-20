@@ -126,9 +126,6 @@ impl State for BasicState {
                 if action == Action::Press {
                     self.key_down_map.insert(key, true);
                 }
-                if action == Action::Release {
-                    self.key_down_map.insert(key, false);
-                }
 
                 if let Some(true) = self.key_down_map.get(&Key::W) {
                     camera.move_in_direction(CAMERA_SPEED * delta_time.time);
@@ -142,6 +139,10 @@ impl State for BasicState {
                 if let Some(true) = self.key_down_map.get(&Key::D) {
                     camera.move_sideways(CAMERA_SPEED * delta_time.time);
                 }
+                if action == Action::Release {
+                    self.key_down_map.insert(key, false);
+                }
+
                 false
             }
             InputEvent::CursorMovement { x_pos, y_pos } => {
