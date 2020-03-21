@@ -82,7 +82,7 @@ impl State for BasicState {
         );
 
         let cube_positions = vec![
-            vec3(0.0, 0.0, 0.0),
+            vec3(0.0, -3.0, 0.0),
             vec3(2.0, 5.0, -15.0),
             vec3(-1.5, -2.2, -2.5),
             vec3(-3.8, -2.0, -12.0),
@@ -95,7 +95,7 @@ impl State for BasicState {
         ];
 
         world.insert(
-            (Selected, ()),
+            (),
             cube_positions.iter().map(|&position| {
                 (
                     Model::cube(),

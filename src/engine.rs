@@ -28,8 +28,8 @@ pub struct Engine {
     events: Receiver<(f64, WindowEvent)>,
 }
 
-pub const WINDOW_HEIGHT: u32 = 800;
-pub const WINDOW_WIDTH: u32 = 1200;
+pub const WINDOW_HEIGHT: u32 = 1200;
+pub const WINDOW_WIDTH: u32 = 1600;
 
 impl Engine {
     // TODO: make builder instead
