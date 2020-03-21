@@ -35,8 +35,8 @@ impl BasicState {
         BasicState {
             systems: Vec::new(),
             first_mouse: true,
-            last_y: (WINDOW_HEIGHT / 2) as f32, // ugly
-            last_x: (WINDOW_WIDTH / 2) as f32,  // ugly
+            last_y: (WINDOW_HEIGHT / 2) as f32, // TODO: ugly
+            last_x: (WINDOW_WIDTH / 2) as f32,  // TODO: ugly
             key_down_map: HashMap::new(),
         }
     }

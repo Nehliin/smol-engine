@@ -46,9 +46,9 @@ impl ShaderSys for OutLineShader {
                             Rad(transform.angle.to_radians()),
                         )
                         * Matrix4::from_nonuniform_scale(
-                            transform.scale.x * 1.1,
-                            transform.scale.y * 1.1,
-                            transform.scale.z * 1.1,
+                            transform.scale.x * 1.05,
+                            transform.scale.y * 1.05,
+                            transform.scale.z * 1.05,
                         );
                     shader
                         .0
