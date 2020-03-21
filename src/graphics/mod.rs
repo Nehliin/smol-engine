@@ -150,19 +150,25 @@ impl BasicRenderer {
 impl Renderer for BasicRenderer {
     fn init(&mut self, resources: &mut Resources) {
         let shader = ModelShader(
-            Shader::new("src/vertex_shader.shader", "src/fragment_shader.shader")
-                .expect("Failed to create model shader"),
+            Shader::new(
+                "src/shader_files/vertex_shader.shader",
+                "src/shader_files/fragment_shader.shader",
+            )
+            .expect("Failed to create model shader"),
         );
         let light_shader = LightShader(
             Shader::new(
-                "src/light_vertex_shader.shader",
-                "src/light_fragment_shader.shader",
+                "src/shader_files/light_vertex_shader.shader",
+                "src/shader_files/light_fragment_shader.shader",
             )
             .expect("Failed to create Light shader"),
         );
         let outline_shader = OutLineShader(
-            Shader::new("src/light_vertex_shader.shader", "src/outline_frag.shader")
-                .expect("Failed to create OutLineShader"),
+            Shader::new(
+                "src/shader_files/light_vertex_shader.shader",
+                "src/shader_files/outline_frag.shader",
+            )
+            .expect("Failed to create OutLineShader"),
         );
         self.shader_systems.push(LightShader::get_system());
         self.shader_systems.push(ModelShader::get_system());
@@ -184,8 +190,11 @@ impl Renderer for BasicRenderer {
 
         // Add post procesing shader:
         self.post_processing_shader = Some(
-            Shader::new("src/post_vertex.shader", "src/post_frag.shader")
-                .expect("Failed to create post processing shader"),
+            Shader::new(
+                "src/shader_files/post_vertex.shader",
+                "src/shader_files/post_frag.shader",
+            )
+            .expect("Failed to create post processing shader"),
         );
         // Bind uniform value here since it never changes:
         unsafe {
