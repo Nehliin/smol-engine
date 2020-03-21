@@ -2,7 +2,7 @@ use crate::camera::Camera;
 use crate::components::Selected;
 use crate::components::{LightTag, Transform};
 use crate::engine::{InputEvent, Time, WINDOW_HEIGHT, WINDOW_WIDTH};
-use crate::lighting::point_light::PointLight;
+use crate::lighting::{DirectionalLight, PointLight};
 use crate::model::Model;
 use cgmath::vec3;
 use glfw::{Action, Key};
@@ -53,7 +53,7 @@ impl State for BasicState {
         ];
 
         world.insert(
-            (),
+            (Selected, ()),
             vec![(
                 Transform {
                     position: vec3(0.0, -1.75, 0.0),
@@ -62,6 +62,14 @@ impl State for BasicState {
                     angle: 0.0,
                 },
                 Model::new("nanosuit/nanosuit.obj"),
+            )],
+        );
+
+        world.insert(
+            (LightTag, ()),
+            vec![(
+                DirectionalLight::default().set_diffuse(vec3(0.0, 0.0, 1.0)),
+                (),
             )],
         );
 
@@ -142,23 +150,23 @@ impl State for BasicState {
                 if key == Key::Escape {
                     return true;
                 }
-                let delta_time = resources.get::<Time>().unwrap();
+                let time = resources.get::<Time>().unwrap();
                 let mut camera = resources.get_mut::<Camera>().unwrap();
                 if action == Action::Press {
                     self.key_down_map.insert(key, true);
                 }
 
                 if let Some(true) = self.key_down_map.get(&Key::W) {
-                    camera.move_in_direction(CAMERA_SPEED * delta_time.time);
+                    camera.move_in_direction(CAMERA_SPEED * time.delta_time);
                 }
                 if let Some(true) = self.key_down_map.get(&Key::S) {
-                    camera.move_in_direction(-CAMERA_SPEED * delta_time.time);
+                    camera.move_in_direction(-CAMERA_SPEED * time.delta_time);
                 }
                 if let Some(true) = self.key_down_map.get(&Key::A) {
-                    camera.move_sideways(-CAMERA_SPEED * delta_time.time);
+                    camera.move_sideways(-CAMERA_SPEED * time.delta_time);
                 }
                 if let Some(true) = self.key_down_map.get(&Key::D) {
-                    camera.move_sideways(CAMERA_SPEED * delta_time.time);
+                    camera.move_sideways(CAMERA_SPEED * time.delta_time);
                 }
                 if action == Action::Release {
                     self.key_down_map.insert(key, false);

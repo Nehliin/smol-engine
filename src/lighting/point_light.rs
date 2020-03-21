@@ -55,7 +55,7 @@ impl PointLight {
         self.diffuse = diffuse;
         self
     }
-    // get uniforms? och sen skicka in till shader istället?
+
     pub unsafe fn set_uniforms(&self, shader: &mut Shader, i: usize, transform: &Transform) {
         shader.set_float(
             &CString::new(format!("pointLights[{}].constant", i)).unwrap(),

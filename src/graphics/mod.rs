@@ -1,3 +1,4 @@
+use crate::engine::Time;
 use crate::engine::{WINDOW_HEIGHT, WINDOW_WIDTH};
 use crate::shaders::{LightShader, ModelShader, OutLineShader, Shader, ShaderSys};
 use core::ffi::c_void;
@@ -219,6 +220,10 @@ impl Renderer for BasicRenderer {
                 gl::Disable(gl::DEPTH_TEST);
                 // activate post process shaders
                 post_shader.use_program();
+                if let Some(time) = resources.get::<Time>() {
+                    post_shader.set_float(&CString::new("time").unwrap(), time.current_time);
+                }
+
                 // bind the quad where the texture is drawn
                 gl::BindVertexArray(self.quad_vao);
                 // (sampler2D uniform for the frame buffer texture

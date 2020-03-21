@@ -13,7 +13,8 @@ pub enum InputEvent {
 }
 
 pub struct Time {
-    pub time: f32,
+    pub current_time: f32,
+    pub delta_time: f32,
 }
 
 pub struct Engine {
@@ -69,7 +70,8 @@ impl Engine {
 
         let mut resources = Resources::default();
         resources.insert(Time {
-            time: glfw.get_time() as f32,
+            current_time: glfw.get_time() as f32,
+            delta_time: 0.0,
         });
         renderer.init(&mut resources);
         println!("RENDERER INITIALIZED!");
@@ -101,7 +103,8 @@ impl Engine {
             last_frame = current_frame;
             {
                 let mut time = self.resources.get_mut::<Time>().unwrap();
-                time.time = delta_time;
+                time.delta_time = delta_time;
+                time.current_time = current_frame;
             }
             self.process_events();
             self.current_state
