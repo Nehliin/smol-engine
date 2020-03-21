@@ -1,7 +1,5 @@
 use crate::camera::Camera;
 use crate::components::{LightTag, Selected, Transform};
-//use crate::lighting::directional_light::DirectionalLight;
-use crate::lighting::point_light::PointLight;
 use crate::model::Model;
 use crate::shaders::Shader;
 use crate::shaders::ShaderSys;

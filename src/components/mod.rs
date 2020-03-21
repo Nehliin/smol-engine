@@ -1,6 +1,6 @@
 use cgmath::prelude::*;
 use cgmath::Matrix4;
-use cgmath::{vec3, Rad, Vector3};
+use cgmath::{Rad, Vector3};
 
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct LightTag;
