@@ -1,6 +1,7 @@
 use crate::engine::{WINDOW_HEIGHT, WINDOW_WIDTH};
 use crate::shaders::{LightShader, ModelShader, OutLineShader, Shader, ShaderSys, SkyBoxShader};
 use core::ffi::c_void;
+use gl::types::*;
 use legion::prelude::{Resources, Schedulable, World};
 use std::ffi::CString;
 use std::path::Path;
@@ -130,11 +131,11 @@ impl BasicRenderer {
         gl::BindVertexArray(self.quad_vao);
 
         gl::BindBuffer(gl::ARRAY_BUFFER, self.quad_vbo);
-        let size = (QUAD_VERTICES.len() * std::mem::size_of::<f32>()) as isize;
+        let size = (QUAD_VERTICES.len() * std::mem::size_of::<GLfloat>()) as isize;
         let data = &QUAD_VERTICES[0] as *const f32 as *const c_void;
         gl::BufferData(gl::ARRAY_BUFFER, size, data, gl::STATIC_DRAW);
 
-        let element_size = std::mem::size_of::<f32>() as i32;
+        let element_size = std::mem::size_of::<GLfloat>() as i32;
         let stride = element_size * 4;
         gl::EnableVertexAttribArray(0);
         gl::VertexAttribPointer(0, 2, gl::FLOAT, gl::FALSE, stride, std::ptr::null());
@@ -192,6 +193,7 @@ impl Renderer for BasicRenderer {
             gl::Enable(gl::CULL_FACE);
             gl::CullFace(gl::BACK);
             gl::FrontFace(gl::CCW);
+            gl::Enable(gl::MULTISAMPLE);
             gl::Enable(gl::DEPTH_TEST);
             gl::Enable(gl::STENCIL_TEST);
             self.set_up_frame_buffer().unwrap();

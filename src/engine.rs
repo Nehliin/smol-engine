@@ -46,6 +46,8 @@ impl Engine {
         ));
         #[cfg(target_os = "macos")]
         glfw.window_hint(glfw::WindowHint::OpenGlForwardCompat(true));
+        // MSAA
+        glfw.window_hint(glfw::WindowHint::Samples(Some(4)));
 
         let (mut window, events) = glfw
             .create_window(
