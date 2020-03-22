@@ -53,7 +53,7 @@ impl State for BasicState {
         ];
 
         world.insert(
-            (Selected, ()),
+            (), // selected
             vec![(
                 Transform {
                     position: vec3(0.0, -1.75, 0.0),
