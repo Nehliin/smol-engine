@@ -180,7 +180,7 @@ impl Model {
         texture
     }
 }
-
+// TODO: use actual paths here!
 pub unsafe fn texture_from_file(path: &str, directory: &str) -> u32 {
     let filename = if !directory.is_empty() {
         format!("{}/{}", directory, path)

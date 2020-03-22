@@ -1,14 +1,20 @@
-use crate::engine::Time;
 use crate::engine::{WINDOW_HEIGHT, WINDOW_WIDTH};
-use crate::shaders::{LightShader, ModelShader, OutLineShader, Shader, ShaderSys};
+use crate::shaders::{LightShader, ModelShader, OutLineShader, Shader, ShaderSys, SkyBoxShader};
 use core::ffi::c_void;
 use legion::prelude::{Resources, Schedulable, World};
 use std::ffi::CString;
+use std::path::Path;
 
 pub trait Renderer {
     fn init(&mut self, resources: &mut Resources);
     fn render_world(&mut self, world: &mut World, resources: &mut Resources);
 }
+
+/*
+TODO: Potential refactor, Create a renderer pipeline where one can chain Renderer traits
+for example the BasicRenderer -> SkyBoxRenderer -> PostProcessingRenderer
+the chain can keep internal state to match stencil testing, framebuffering etc
+*/
 
 // Verticies for the simple rectangle where the off
 // screen rendered textured, (this is in normalized device coordinates)
@@ -51,7 +57,7 @@ impl BasicRenderer {
             frame_buffer: 0,
             frame_buffer_texture: 0,
             render_buffer: 0,
-            quad_vao: 0,
+            quad_vao: 0, // TODO: break these out to a postProcessing renderer
             quad_vbo: 0,
             post_processing_shader: None,
         }
@@ -170,10 +176,14 @@ impl Renderer for BasicRenderer {
             )
             .expect("Failed to create OutLineShader"),
         );
+
         self.shader_systems.push(LightShader::get_system());
         self.shader_systems.push(ModelShader::get_system());
         self.shader_systems.push(OutLineShader::get_system());
+        let skybox_shader = SkyBoxShader::new(&Path::new("skybox"));
+        self.shader_systems.push(SkyBoxShader::get_system());
 
+        resources.insert(skybox_shader);
         resources.insert(light_shader);
         resources.insert(shader);
         resources.insert(outline_shader);
@@ -210,7 +220,6 @@ impl Renderer for BasicRenderer {
             // The framebuffer is first bound so all draw commands affect that framebuffer instead of the
             // default one
             unsafe {
-                gl::Enable(gl::DEPTH_TEST);
                 gl::BindFramebuffer(gl::FRAMEBUFFER, self.frame_buffer);
                 gl::ClearColor(0.2, 0.3, 0.3, 1.0);
                 gl::Clear(gl::COLOR_BUFFER_BIT | gl::DEPTH_BUFFER_BIT | gl::STENCIL_BUFFER_BIT);
@@ -229,9 +238,6 @@ impl Renderer for BasicRenderer {
                 gl::Disable(gl::DEPTH_TEST);
                 // activate post process shaders
                 post_shader.use_program();
-                if let Some(time) = resources.get::<Time>() {
-                    post_shader.set_float(&CString::new("time").unwrap(), time.current_time);
-                }
 
                 // bind the quad where the texture is drawn
                 gl::BindVertexArray(self.quad_vao);
@@ -244,6 +250,7 @@ impl Renderer for BasicRenderer {
                 // set everything back to normal
                 gl::BindVertexArray(0);
                 gl::BindTexture(gl::TEXTURE_2D, 0);
+                gl::Enable(gl::DEPTH_TEST);
             }
         } else {
             self.shader_systems
