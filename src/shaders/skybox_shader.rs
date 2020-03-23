@@ -80,14 +80,6 @@ impl SkyBoxShader {
         };
         unsafe {
             skybox.generate_cube();
-            /*skybox.texture = SkyBoxShader::loadCubemap(&vec![
-                "skybox/1.jpg",
-                "skybox/2.jpg",
-                "skybox/3.jpg",
-                "skybox/4.jpg",
-                "skybox/5.jpg",
-                "skybox/6.jpg",
-            ]);*/
             skybox.load_textures().unwrap();
             skybox.shader.use_program();
             skybox

@@ -10,11 +10,13 @@ use std::io::Read as IoRead;
 pub mod light_shader;
 pub mod model_shader;
 pub mod outline_shader;
+pub mod shadow_depth_shader;
 pub mod skybox_shader;
 
 pub use light_shader::LightShader;
 pub use model_shader::ModelShader;
 pub use outline_shader::OutLineShader;
+pub use shadow_depth_shader::ShadowDepthShader;
 pub use skybox_shader::SkyBoxShader;
 
 #[derive(Debug, Clone, Copy)]

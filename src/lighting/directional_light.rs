@@ -4,10 +4,10 @@ use cgmath::Vector3;
 use std::ffi::CString;
 
 pub struct DirectionalLight {
-    pub(super) direction: Vector3<f32>,
-    pub(super) ambient: Vector3<f32>,
-    pub(super) specular: Vector3<f32>,
-    pub(super) diffuse: Vector3<f32>,
+    pub direction: Vector3<f32>,
+    pub ambient: Vector3<f32>,
+    pub specular: Vector3<f32>,
+    pub diffuse: Vector3<f32>,
 }
 
 impl Default for DirectionalLight {

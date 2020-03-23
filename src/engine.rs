@@ -1,4 +1,4 @@
-use crate::camera::Camera;
+use crate::camera::{Camera, WINDOW_HEIGHT, WINDOW_WIDTH};
 use crate::graphics::Renderer;
 use crate::state::State;
 use cgmath::{vec3, Point3};
@@ -28,9 +28,6 @@ pub struct Engine {
     window: Window,
     events: Receiver<(f64, WindowEvent)>,
 }
-
-pub const WINDOW_HEIGHT: u32 = 1200;
-pub const WINDOW_WIDTH: u32 = 1600;
 
 impl Engine {
     // TODO: make builder instead

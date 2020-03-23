@@ -7,6 +7,10 @@ use cgmath::{Matrix4, Point3};
 
 const UP: Vector3<f32> = vec3(0., 1., 0.);
 
+// TODO: Make these non constants
+pub const WINDOW_HEIGHT: u32 = 1200;
+pub const WINDOW_WIDTH: u32 = 1600;
+
 pub struct Camera {
     direction: Vector3<f32>,
     position: Point3<f32>,

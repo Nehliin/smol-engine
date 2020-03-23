@@ -158,22 +158,22 @@ impl Renderer for BasicRenderer {
     fn init(&mut self, resources: &mut Resources) {
         let shader = ModelShader(
             Shader::new(
-                "src/shader_files/vertex_shader.shader",
-                "src/shader_files/fragment_shader.shader",
+                "shader_files/vertex_shader.shader",
+                "shader_files/fragment_shader.shader",
             )
             .expect("Failed to create model shader"),
         );
         let light_shader = LightShader(
             Shader::new(
-                "src/shader_files/light_vertex_shader.shader",
-                "src/shader_files/light_fragment_shader.shader",
+                "shader_files/light_vertex_shader.shader",
+                "shader_files/light_fragment_shader.shader",
             )
             .expect("Failed to create Light shader"),
         );
         let outline_shader = OutLineShader(
             Shader::new(
-                "src/shader_files/light_vertex_shader.shader",
-                "src/shader_files/outline_frag.shader",
+                "shader_files/light_vertex_shader.shader",
+                "shader_files/outline_frag.shader",
             )
             .expect("Failed to create OutLineShader"),
         );
@@ -219,6 +219,7 @@ impl Renderer for BasicRenderer {
 
     fn render_world(&mut self, world: &mut World, resources: &mut Resources) {
         if let Some(post_shader) = &mut self.post_processing_shader {
+            // TODO: Maybe its worth to have some framebuffer object that can run before separated from a shader??
             // The framebuffer is first bound so all draw commands affect that framebuffer instead of the
             // default one
             unsafe {

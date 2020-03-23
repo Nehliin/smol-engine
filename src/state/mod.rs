@@ -1,7 +1,7 @@
-use crate::camera::Camera;
+use crate::camera::{Camera, WINDOW_HEIGHT, WINDOW_WIDTH};
 use crate::components::Selected;
 use crate::components::{LightTag, Transform};
-use crate::engine::{InputEvent, Time, WINDOW_HEIGHT, WINDOW_WIDTH};
+use crate::engine::{InputEvent, Time};
 use crate::lighting::{DirectionalLight, PointLight};
 use crate::model::Model;
 use cgmath::vec3;
