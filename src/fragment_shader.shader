@@ -85,9 +85,9 @@ vec3 calculate_directional_light(DirectionalLight light, vec3 normal) {
 
   // specular calculation
   vec3 viewDir = normalize(viewPos - fragmentPosition);
-  vec3 reflectDir = reflect(-direction_to_light, normal);
+  vec3 halfwayDir = normalize(direction_to_light + viewDir);
 
-  float spec = pow(max(dot(viewDir, reflectDir), 0.0), material.shininess);
+  float spec = pow(max(dot(normal, halfwayDir), 0.0), material.shininess);
   float diff = max(dot(normal, direction_to_light), 0.0);
   for(int i = 0; i < number_of_specular_textures; ++i) {
     result += light.specular * spec * texture(material.specular_textures[i], texCoords).rgb;
@@ -108,9 +108,9 @@ vec3 calculate_point_light(PointLight light, vec3 normal) {
   vec3 result = vec3(0.0);
 
   vec3 viewDir = normalize(viewPos - fragmentPosition);
-  vec3 reflectDir = reflect(-direction_to_light, normal);
+  vec3 halfwayDir = normalize(direction_to_light + viewDir);
 
-  float spec = pow(max(dot(viewDir, reflectDir), 0.0), material.shininess);
+  float spec = pow(max(dot(normal, halfwayDir), 0.0), material.shininess);
   float diff = max(dot(normal, direction_to_light), 0.0);
   float attenuation = calculate_attenuation(light.position, light.constant, light.linear, light.quadratic);
   
@@ -131,9 +131,9 @@ vec3 calculate_spot_light(SpotLight light, vec3 normal) {
   vec3 result = vec3(0.0);
 
   vec3 viewDir = normalize(viewPos - fragmentPosition);
-  vec3 reflectDir = reflect(-direction_to_light, normal);
+  vec3 halfwayDir = normalize(direction_to_light + viewDir);
 
-  float spec = pow(max(dot(viewDir, reflectDir), 0.0), material.shininess);
+  float spec = pow(max(dot(normal, halfwayDir), 0.0), material.shininess);
   float diff = max(dot(normal, direction_to_light), 0.0);
   float attenuation = calculate_attenuation(light.position, light.constant, light.linear, light.quadratic);
 
