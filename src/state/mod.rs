@@ -1,4 +1,5 @@
 use crate::camera::Camera;
+use crate::components::Selected;
 use crate::components::{LightTag, Transform};
 use crate::engine::{InputEvent, Time, WINDOW_HEIGHT, WINDOW_WIDTH};
 use crate::lighting::point_light::PointLight;
@@ -43,7 +44,7 @@ impl BasicState {
 const CAMERA_SPEED: f32 = 4.5;
 
 impl State for BasicState {
-    fn start(&mut self, world: &mut World, resources: &mut Resources) {
+    fn start(&mut self, world: &mut World, _resources: &mut Resources) {
         let light_positions = vec![
             vec3(0.7, 0.2, 2.0),
             vec3(2.3, -3.3, -4.0),
@@ -94,7 +95,7 @@ impl State for BasicState {
         ];
 
         world.insert(
-            (),
+            (Selected, ()),
             cube_positions.iter().map(|&position| {
                 (
                     Model::cube(),
@@ -119,9 +120,9 @@ impl State for BasicState {
         world.insert((), vec![(floor, floor_transform)]);
     }
 
-    fn update(&mut self, world: &mut World, resources: &mut Resources) {}
+    fn update(&mut self, _world: &mut World, _resources: &mut Resources) {}
 
-    fn stop(&mut self, world: &mut World, resources: &mut Resources) {
+    fn stop(&mut self, _world: &mut World, _resources: &mut Resources) {
         unimplemented!()
     }
 

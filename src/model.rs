@@ -1,7 +1,7 @@
 use crate::mesh::Mesh;
 use crate::mesh::Texture;
 use crate::mesh::Vertex;
-use crate::shader::Shader;
+use crate::shaders::Shader;
 use cgmath::vec2;
 use cgmath::vec3;
 use core::ffi::c_void;

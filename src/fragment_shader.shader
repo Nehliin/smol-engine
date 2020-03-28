@@ -195,6 +195,6 @@ void main() {
   for(int i = 0; i < number_of_spot_lights; i++) {
     result += calculate_spot_light(spotLights[i], norm);
   }
-  FragColor =  vec4(result, 1.0);
+  FragColor = vec4(result, 1.0);
      
 }
