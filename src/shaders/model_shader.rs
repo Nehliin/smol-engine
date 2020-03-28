@@ -1,13 +1,16 @@
 use crate::camera::Camera;
 use crate::components::Selected;
 use crate::components::{LightTag, Transform};
-//use crate::lighting::directional_light::DirectionalLight;
+use crate::lighting::directional_light::DirectionalLight;
 use crate::lighting::point_light::PointLight;
 use crate::model::Model;
 use crate::shaders::Shader;
 use crate::shaders::ShaderSys;
 use legion::prelude::*;
 use std::ffi::CString;
+
+// TODO: investigate if there could be a single unified light component that can wrap the different light types
+// so there can be fewer queries?
 
 pub struct ModelShader(pub Shader);
 
@@ -25,11 +28,17 @@ impl ShaderSys for ModelShader {
                     .filter(!tag::<Selected>() & !tag::<LightTag>()),
             )
             .with_query(<(Read<Transform>, Read<PointLight>)>::query().filter(tag::<LightTag>()))
+            .with_query(<Read<DirectionalLight>>::query().filter(tag::<LightTag>()))
             .build(
                 |_,
                  world,
                  (shader, camera),
-                 (selected_model_query, non_selected_model_query, uniform_query)| unsafe {
+                 (
+                    selected_model_query,
+                    non_selected_model_query,
+                    point_light_query,
+                    directional_light_query,
+                )| unsafe {
                     // keep stencil value if anything fails, replace with
                     // value from stencil buffer if it passes
                     // (also implicit enable of depth test here, it's the engine default)
@@ -52,7 +61,7 @@ impl ShaderSys for ModelShader {
                     //shader.0.set_uniforms(&mut world);// ^---- alla light uniforms måste sättas här
 
                     let mut light_count = 0;
-                    for (i, (transform, point_light)) in uniform_query.iter(world).enumerate() {
+                    for (i, (transform, point_light)) in point_light_query.iter(world).enumerate() {
                         point_light.set_uniforms(&mut shader.0, i, &transform);
                         light_count += 1;
                     }
@@ -60,10 +69,10 @@ impl ShaderSys for ModelShader {
                         &CString::new("number_of_point_lights").unwrap(),
                         light_count,
                     );
-                    //  let query = <Read<DirectionalLight>>::query().filter(tag::<Light>());
-                    //if let Some(directional_light) = query.iter(world).next() {
-                    //directional_light.set_uniforms(&mut shader.0);
-                    //}
+
+                    if let Some(directional_light) = directional_light_query.iter(world).next() {
+                        directional_light.set_uniforms(&mut shader.0);
+                    }
 
                     //let query = <(Read<Transform>, Read<Model>)>::query().filter(!tag::<Light>());
                     // Non selected models shouldn't write to the stencil buffer!
