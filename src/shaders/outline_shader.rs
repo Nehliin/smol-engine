@@ -15,7 +15,7 @@ impl ShaderSys for OutLineShader {
             .write_resource::<OutLineShader>() //TODO: EN samlad resurs med alla shaders istället??
             .read_resource::<Camera>()
             .with_query(
-                <(Read<Transform>, Read<Model>)>::query()
+                <(Write<Transform>, Read<Model>)>::query()
                     .filter(tag::<Selected>() & !tag::<LightTag>()), // <-- try to remove if there are issues
             )
             .build(|_, world, (shader, camera), model_query| unsafe {
@@ -37,21 +37,15 @@ impl ShaderSys for OutLineShader {
                 shader
                     .0
                     .set_mat4(&CString::new("view").unwrap(), &camera.get_view_matrix());
-                for (transform, model) in model_query.iter(world) {
-                    let transform_matrix = Matrix4::new_translation(&transform.position)
-                        * Matrix4::from_axis_angle(
-                            &Unit::new_normalize(transform.rotation),
-                            transform.angle.to_radians(),
-                        )
-                        * Matrix4::new_nonuniform_scaling(&Vector3::new(
-                            transform.scale.x * 1.05,
-                            transform.scale.y * 1.05,
-                            transform.scale.z * 1.05,
-                        ));
-                    shader
-                        .0
-                        .set_mat4(&CString::new("model").unwrap(), &transform_matrix);
+                for (mut transform, model) in model_query.iter_mut(world) {
+                    transform.scale *= 1.05;
+                    shader.0.set_mat4(
+                        &CString::new("model").unwrap(),
+                        &transform.get_model_matrix(),
+                    );
                     model.draw(&mut shader.0);
+
+                    transform.scale *= 0.95;
                 }
                 gl::StencilMask(0xFF);
                 gl::StencilFunc(gl::ALWAYS, 1, 0xFF);

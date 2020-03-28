@@ -52,9 +52,7 @@ impl Physics {
                     );
                     for (physics_body, mut transform) in query.iter_mut(world) {
                         if let Some(collider) = collider_set.get(physics_body.collider_handle) {
-                            transform.position = collider.position().translation.vector;
-                            //   dbg!(collider.position().rotation);
-                            transform.rotation = collider.position().rotation.as_vector().xyz();
+                            transform.isometry = *collider.position();
                         }
                     }
                 },
@@ -68,16 +66,7 @@ impl Physics {
         body_status: BodyStatus,
     ) -> PhysicsBody {
         let cube_body = RigidBodyDesc::new()
-            .translation(Vector3::new(
-                transform.position.x,
-                transform.position.y,
-                transform.position.z,
-            ))
-            .rotation(Vector3::new(
-                transform.rotation.x,
-                transform.rotation.y,
-                transform.rotation.z,
-            ))
+            .position(transform.isometry)
             .status(body_status)
             .mass(5.0)
             .build();
@@ -88,9 +77,9 @@ impl Physics {
         let body_handle = body_set.insert(cube_body);
 
         let shape = ShapeHandle::new(Cuboid::new(Vector3::new(
-            transform.scale.x,
-            transform.scale.y,
-            transform.scale.z,
+            transform.scale.x / 2.0,
+            transform.scale.y / 2.0,
+            transform.scale.z / 2.0,
         )));
 
         let collider = ColliderDesc::new(shape)

@@ -7,7 +7,7 @@ use crate::model::Model;
 use crate::physics::Physics;
 use glfw::{Action, Key};
 use legion::prelude::*;
-use nalgebra::Vector3;
+use nalgebra::{Isometry3, Vector3};
 use nphysics3d::object::BodyStatus;
 use std::collections::HashMap;
 
@@ -60,12 +60,10 @@ impl State for BasicState {
         world.insert(
             (), // selected
             vec![(
-                Transform {
-                    position: Vector3::new(0.0, -1.75, 0.0),
-                    scale: Vector3::new(0.2, 0.2, 0.2),
-                    rotation: Vector3::new(1.0, 1.0, 1.0),
-                    angle: 0.0,
-                },
+                Transform::new(
+                    Isometry3::translation(0.0, -1.75, 0.0),
+                    Vector3::new(0.2, 0.2, 0.2),
+                ),
                 Model::new("nanosuit/nanosuit.obj"),
             )],
         );
@@ -82,12 +80,10 @@ impl State for BasicState {
             (LightTag, ()), // <--- maybe shader tag here?
             light_positions.iter().map(|&position| {
                 (
-                    Transform {
-                        position,
-                        scale: Vector3::new(0.5, 0.5, 0.5),
-                        rotation: Vector3::new(1.0, 1.0, 1.0),
-                        angle: 0.0,
-                    },
+                    Transform::new(
+                        Isometry3::translation(position.x, position.y, position.z),
+                        Vector3::new(0.5, 0.5, 0.5),
+                    ),
                     Model::cube(),
                     PointLight::default(),
                 )
@@ -110,12 +106,7 @@ impl State for BasicState {
         world.insert(
             (),
             cube_positions.iter().map(|&position| {
-                let transform = Transform {
-                    position,
-                    scale: Vector3::new(1.0, 1.0, 1.0),
-                    rotation: Vector3::new(1.0, 1.0, 1.0),
-                    angle: 0.0,
-                };
+                let transform = Transform::from_position(position);
                 (
                     Model::cube(),
                     Physics::create_cube(resources, &transform, BodyStatus::Dynamic),
@@ -125,12 +116,13 @@ impl State for BasicState {
         );
 
         let floor = Model::cube();
-        let floor_transform = Transform {
-            position: Vector3::new(0.0, -5.0, -2.0),
-            scale: Vector3::new(0.1, 10.0, 10.0),
-            rotation: Vector3::new(0.0, 0.0, 1.0),
-            angle: 90_f32,
-        };
+        let floor_transform = Transform::new(
+            Isometry3::new(
+                Vector3::new(0.0, -5.0, -2.0),
+                Vector3::z() * 90.0_f32.to_radians(),
+            ),
+            Vector3::new(0.1, 10.0, 10.0),
+        );
 
         world.insert(
             (),
@@ -202,7 +194,7 @@ impl State for BasicState {
                 self.last_x = xpos;
                 self.last_y = ypos;
 
-                let sensitivity: f32 = 0.001; // change this value to your liking
+                let sensitivity: f32 = 0.05; // change this value to your liking
                 xoffset *= sensitivity;
                 yoffset *= sensitivity;
                 let yaw = camera.get_yaw();

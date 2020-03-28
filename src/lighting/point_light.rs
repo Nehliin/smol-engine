@@ -83,7 +83,7 @@ impl PointLight {
         );
         shader.set_vector3(
             &CString::new(format!("pointLights[{}].position", i)).unwrap(),
-            &transform.position,
+            &transform.translation(),
         );
     }
 
