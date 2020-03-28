@@ -2,11 +2,10 @@ use crate::mesh::Mesh;
 use crate::mesh::Texture;
 use crate::mesh::Vertex;
 use crate::shaders::Shader;
-use cgmath::vec2;
-use cgmath::vec3;
 use core::ffi::c_void;
 use image::DynamicImage::*;
 use image::GenericImage;
+use nalgebra::{Vector2, Vector3};
 use std::path::Path;
 
 // trash structure
@@ -94,9 +93,9 @@ impl Model {
         let verticies = VERTICIES
             .chunks_exact(8)
             .map(|chunk| Vertex {
-                position: vec3(chunk[0], chunk[1], chunk[2]),
-                normal: vec3(chunk[3], chunk[4], chunk[5]),
-                tex_coords: vec2(chunk[6], chunk[7]),
+                position: Vector3::new(chunk[0], chunk[1], chunk[2]),
+                normal: Vector3::new(chunk[3], chunk[4], chunk[5]),
+                tex_coords: Vector2::new(chunk[6], chunk[7]),
             })
             .collect();
         let mesh = Mesh::new_unindexed(verticies, vec![texture_diffuse, texture_specular]);
@@ -135,9 +134,13 @@ impl Model {
 
             for i in 0..num_vertices {
                 vertices.push(Vertex {
-                    position: vec3(positions[i * 3], positions[i * 3 + 1], positions[i * 3 + 2]),
-                    normal: vec3(normals[i * 3], normals[i * 3 + 1], normals[i * 3 + 2]),
-                    tex_coords: vec2(tex_coords[i * 2], tex_coords[i * 2 + 1]),
+                    position: Vector3::new(
+                        positions[i * 3],
+                        positions[i * 3 + 1],
+                        positions[i * 3 + 2],
+                    ),
+                    normal: Vector3::new(normals[i * 3], normals[i * 3 + 1], normals[i * 3 + 2]),
+                    tex_coords: Vector2::new(tex_coords[i * 2], tex_coords[i * 2 + 1]),
                 })
             }
 

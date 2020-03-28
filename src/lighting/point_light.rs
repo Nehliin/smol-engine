@@ -3,8 +3,7 @@
 use crate::components::Transform;
 use crate::lighting::Strength;
 use crate::shaders::Shader;
-use cgmath::vec3;
-use cgmath::Vector3;
+use nalgebra::Vector3;
 use std::ffi::CString;
 
 pub struct PointLight {
@@ -24,10 +23,10 @@ impl Default for PointLight {
         let quadratic = 0.032;
 
         PointLight {
-            position: vec3(0.0, 0.0, 0.0),
-            ambient: vec3(0.1, 0.1, 0.1),
-            specular: vec3(1.0, 1.0, 1.0),
-            diffuse: vec3(1.0, 1.0, 1.0),
+            position: Vector3::new(0.0, 0.0, 0.0),
+            ambient: Vector3::new(0.1, 0.1, 0.1),
+            specular: Vector3::new(1.0, 1.0, 1.0),
+            diffuse: Vector3::new(1.0, 1.0, 1.0),
             constant,
             linear,
             quadratic,

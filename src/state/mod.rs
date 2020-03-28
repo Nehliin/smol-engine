@@ -5,9 +5,9 @@ use crate::engine::{InputEvent, Time, WINDOW_HEIGHT, WINDOW_WIDTH};
 use crate::lighting::{DirectionalLight, PointLight};
 use crate::model::Model;
 use crate::physics::Physics;
-use cgmath::vec3;
 use glfw::{Action, Key};
 use legion::prelude::*;
+use nalgebra::Vector3;
 use nphysics3d::object::BodyStatus;
 use std::collections::HashMap;
 
@@ -51,19 +51,19 @@ impl State for BasicState {
         self.systems.push(physicis.system);
 
         let light_positions = vec![
-            vec3(0.7, 0.2, 2.0),
-            vec3(2.3, -3.3, -4.0),
-            vec3(-4.0, 2.0, -12.0),
-            vec3(0.0, 0.0, -3.0),
+            Vector3::new(0.7, 0.2, 2.0),
+            Vector3::new(2.3, -3.3, -4.0),
+            Vector3::new(-4.0, 2.0, -12.0),
+            Vector3::new(0.0, 0.0, -3.0),
         ];
 
         world.insert(
             (), // selected
             vec![(
                 Transform {
-                    position: vec3(0.0, -1.75, 0.0),
-                    scale: vec3(0.2, 0.2, 0.2),
-                    rotation: vec3(1.0, 1.0, 1.0),
+                    position: Vector3::new(0.0, -1.75, 0.0),
+                    scale: Vector3::new(0.2, 0.2, 0.2),
+                    rotation: Vector3::new(1.0, 1.0, 1.0),
                     angle: 0.0,
                 },
                 Model::new("nanosuit/nanosuit.obj"),
@@ -73,7 +73,7 @@ impl State for BasicState {
         world.insert(
             (LightTag, ()),
             vec![(
-                DirectionalLight::default().set_diffuse(vec3(0.0, 0.0, 1.0)),
+                DirectionalLight::default().set_diffuse(Vector3::new(0.0, 0.0, 1.0)),
                 (),
             )],
         );
@@ -84,8 +84,8 @@ impl State for BasicState {
                 (
                     Transform {
                         position,
-                        scale: vec3(0.5, 0.5, 0.5),
-                        rotation: vec3(1.0, 1.0, 1.0),
+                        scale: Vector3::new(0.5, 0.5, 0.5),
+                        rotation: Vector3::new(1.0, 1.0, 1.0),
                         angle: 0.0,
                     },
                     Model::cube(),
@@ -95,16 +95,16 @@ impl State for BasicState {
         );
 
         let cube_positions = vec![
-            vec3(0.0, -3.0, 0.0),
-            vec3(2.0, 5.0, -15.0),
-            vec3(-1.5, -2.2, -2.5),
-            vec3(-3.8, -2.0, -12.0),
-            vec3(2.4, -0.4, -3.5),
-            vec3(-1.7, 3.0, -7.5),
-            vec3(1.3, -2.0, -2.5),
-            vec3(1.5, 2.0, -2.5),
-            vec3(1.5, 0.2, -1.5),
-            vec3(-1.3, 1.0, -1.5),
+            Vector3::new(0.0, -3.0, 0.0),
+            Vector3::new(2.0, 5.0, -15.0),
+            Vector3::new(-1.5, -2.2, -2.5),
+            Vector3::new(-3.8, -2.0, -12.0),
+            Vector3::new(2.4, -0.4, -3.5),
+            Vector3::new(-1.7, 3.0, -7.5),
+            Vector3::new(1.3, -2.0, -2.5),
+            Vector3::new(1.5, 2.0, -2.5),
+            Vector3::new(1.5, 0.2, -1.5),
+            Vector3::new(-1.3, 1.0, -1.5),
         ];
 
         world.insert(
@@ -112,8 +112,8 @@ impl State for BasicState {
             cube_positions.iter().map(|&position| {
                 let transform = Transform {
                     position,
-                    scale: vec3(1.0, 1.0, 1.0),
-                    rotation: vec3(1.0, 1.0, 1.0),
+                    scale: Vector3::new(1.0, 1.0, 1.0),
+                    rotation: Vector3::new(1.0, 1.0, 1.0),
                     angle: 0.0,
                 };
                 (
@@ -126,9 +126,9 @@ impl State for BasicState {
 
         let floor = Model::cube();
         let floor_transform = Transform {
-            position: vec3(0.0, -5.0, -2.0),
-            scale: vec3(0.1, 10.0, 10.0),
-            rotation: vec3(0.0, 0.0, 1.0),
+            position: Vector3::new(0.0, -5.0, -2.0),
+            scale: Vector3::new(0.1, 10.0, 10.0),
+            rotation: Vector3::new(0.0, 0.0, 1.0),
             angle: 90_f32,
         };
 

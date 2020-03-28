@@ -1,9 +1,9 @@
 use crate::camera::Camera;
 use crate::graphics::Renderer;
 use crate::state::State;
-use cgmath::{vec3, Point3};
 use glfw::{Action, Context, Glfw, Key, Window, WindowEvent};
 use legion::prelude::*;
+use nalgebra::{Point3, Vector3};
 use std::sync::mpsc::Receiver;
 
 //TODO: move this
@@ -79,7 +79,7 @@ impl Engine {
         println!("RENDERER INITIALIZED!");
         let camera = Camera::new(
             Point3::new(0., 0., 3.),
-            vec3(0., 0., -1.),
+            Vector3::new(0., 0., -1.),
             WINDOW_WIDTH,
             WINDOW_HEIGHT,
         );

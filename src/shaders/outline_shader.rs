@@ -3,10 +3,8 @@ use crate::components::{LightTag, Selected, Transform};
 use crate::model::Model;
 use crate::shaders::Shader;
 use crate::shaders::ShaderSys;
-use cgmath::prelude::*;
-use cgmath::Matrix4;
-use cgmath::Rad;
 use legion::prelude::*;
+use nalgebra::{Matrix4, Unit, Vector3};
 use std::ffi::CString;
 
 pub struct OutLineShader(pub Shader);
@@ -40,16 +38,16 @@ impl ShaderSys for OutLineShader {
                     .0
                     .set_mat4(&CString::new("view").unwrap(), &camera.get_view_matrix());
                 for (transform, model) in model_query.iter(world) {
-                    let transform_matrix = Matrix4::from_translation(transform.position)
+                    let transform_matrix = Matrix4::new_translation(&transform.position)
                         * Matrix4::from_axis_angle(
-                            transform.rotation.normalize(),
-                            Rad(transform.angle.to_radians()),
+                            &Unit::new_normalize(transform.rotation),
+                            transform.angle.to_radians(),
                         )
-                        * Matrix4::from_nonuniform_scale(
+                        * Matrix4::new_nonuniform_scaling(&Vector3::new(
                             transform.scale.x * 1.05,
                             transform.scale.y * 1.05,
                             transform.scale.z * 1.05,
-                        );
+                        ));
                     shader
                         .0
                         .set_mat4(&CString::new("model").unwrap(), &transform_matrix);

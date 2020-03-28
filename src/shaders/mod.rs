@@ -1,5 +1,3 @@
-use cgmath::prelude::*;
-use cgmath::{Array, Matrix4, Vector3, Vector4};
 use gl::types::*;
 use legion::prelude::*;
 use std::ffi::CStr;
@@ -14,6 +12,7 @@ pub mod skybox_shader;
 
 pub use light_shader::LightShader;
 pub use model_shader::ModelShader;
+use nalgebra::{Matrix4, Vector3, Vector4};
 pub use outline_shader::OutLineShader;
 pub use skybox_shader::SkyBoxShader;
 

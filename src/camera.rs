@@ -1,17 +1,15 @@
 #![allow(dead_code)]
 
-use cgmath::prelude::*;
-use cgmath::{vec3, Vector3};
-use cgmath::{Deg, Rad};
-use cgmath::{Matrix4, Point3};
+use nalgebra::geometry::Perspective3;
+use nalgebra::{Matrix4, Point3, Vector3};
 
-const UP: Vector3<f32> = vec3(0., 1., 0.);
+//const UP: Vector3<f32> = Vector3::new(0.0, 1.0, 0.0);
 
 pub struct Camera {
     direction: Vector3<f32>,
     position: Point3<f32>,
     view_matrix: Matrix4<f32>,
-    projection_matrix: Matrix4<f32>,
+    projection_matrix: Perspective3<f32>,
     pitch: f32,
     yaw: f32,
 }
@@ -33,10 +31,10 @@ impl Camera {
         Camera {
             direction,
             position,
-            view_matrix: Matrix4::look_at(position, view_target, UP),
-            projection_matrix: cgmath::perspective(
-                Deg(45.0),
+            view_matrix: Matrix4::look_at_rh(&position, &view_target, &Vector3::new(0.0, 1.0, 0.0)),
+            projection_matrix: Perspective3::new(
                 window_width as f32 / window_height as f32,
+                45.0,
                 0.1,
                 100.0,
             ),
@@ -48,7 +46,11 @@ impl Camera {
     #[inline]
     pub fn set_direction(&mut self, direction: Vector3<f32>) {
         self.direction = direction;
-        self.view_matrix = Matrix4::look_at(self.position, self.position + self.direction, UP);
+        self.view_matrix = Matrix4::look_at_rh(
+            &self.position,
+            &(self.position + self.direction),
+            &Vector3::new(0.0, 1.0, 0.0),
+        );
     }
 
     #[inline]
@@ -69,13 +71,25 @@ impl Camera {
     #[inline]
     pub fn move_in_direction(&mut self, amount: f32) {
         self.position += self.direction * amount;
-        self.view_matrix = Matrix4::look_at(self.position, self.position + self.direction, UP);
+        self.view_matrix = Matrix4::look_at_rh(
+            &self.position,
+            &(self.position + self.direction),
+            &Vector3::new(0.0, 1.0, 0.0),
+        );
     }
 
     #[inline]
     pub fn move_sideways(&mut self, amount: f32) {
-        self.position += self.direction.cross(UP).normalize() * amount;
-        self.view_matrix = Matrix4::look_at(self.position, self.position + self.direction, UP);
+        self.position += self
+            .direction
+            .cross(&Vector3::new(0.0, 1.0, 0.0))
+            .normalize()
+            * amount;
+        self.view_matrix = Matrix4::look_at_rh(
+            &self.position,
+            &(self.position + self.direction),
+            &Vector3::new(0.0, 1.0, 0.0),
+        );
     }
 
     #[inline]
@@ -85,7 +99,7 @@ impl Camera {
 
     #[inline]
     pub fn get_projection_matrix(&self) -> &Matrix4<f32> {
-        &self.projection_matrix
+        &self.projection_matrix.as_matrix()
     }
 
     #[inline]
@@ -118,11 +132,15 @@ impl Camera {
 
     #[inline]
     fn update_rotation(&mut self) {
-        self.direction.x = Rad(self.yaw).cos() * Rad(self.pitch).cos();
-        self.direction.y = Rad(self.pitch).sin();
-        self.direction.z = Rad(self.yaw).sin() * Rad(self.pitch).cos();
-        self.direction.normalize();
+        self.direction.x = self.yaw.to_radians().cos() * self.pitch.to_radians().cos();
+        self.direction.y = self.pitch.to_radians().sin();
+        self.direction.z = self.yaw.to_radians().sin() * self.pitch.to_radians().cos();
+        self.direction.normalize_mut();
 
-        self.view_matrix = Matrix4::look_at(self.position, self.position + self.direction, UP);
+        self.view_matrix = Matrix4::look_at_rh(
+            &self.position,
+            &(self.position + self.direction),
+            &Vector3::new(0.0, 1.0, 0.0),
+        );
     }
 }

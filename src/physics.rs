@@ -1,5 +1,5 @@
 use crate::components::{PhysicsBody, Transform};
-use cgmath::vec3;
+
 use legion::prelude::*;
 use nalgebra::Vector3;
 use ncollide3d::shape::{Cuboid, ShapeHandle};
@@ -52,17 +52,9 @@ impl Physics {
                     );
                     for (physics_body, mut transform) in query.iter_mut(world) {
                         if let Some(collider) = collider_set.get(physics_body.collider_handle) {
-                            transform.position = vec3(
-                                collider.position().translation.x,
-                                collider.position().translation.y,
-                                collider.position().translation.z,
-                            );
+                            transform.position = collider.position().translation.vector;
                             //   dbg!(collider.position().rotation);
-                            transform.rotation = vec3(
-                                collider.position().rotation.as_vector().x,
-                                collider.position().rotation.as_vector().y,
-                                collider.position().rotation.as_vector().z,
-                            );
+                            transform.rotation = collider.position().rotation.as_vector().xyz();
                         }
                     }
                 },
