@@ -93,10 +93,6 @@ impl Engine {
     // Run the main game loop
     pub fn run(&mut self) {
         let mut last_frame = 0.0;
-        unsafe {
-            gl::Enable(gl::DEPTH_TEST);
-            gl::Enable(gl::STENCIL_TEST);
-        }
         self.current_state
             .start(&mut self.world, &mut self.resources);
         while !self.window.should_close() {

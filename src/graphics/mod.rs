@@ -42,6 +42,13 @@ impl Renderer for BasicRenderer {
         resources.insert(light_shader);
         resources.insert(shader);
         resources.insert(outline_shader);
+        unsafe {
+            gl::Enable(gl::CULL_FACE);
+            gl::CullFace(gl::BACK);
+            gl::FrontFace(gl::CCW);
+            gl::Enable(gl::DEPTH_TEST);
+            gl::Enable(gl::STENCIL_TEST);
+        }
     }
 
     fn render_world(&mut self, world: &mut World, resources: &mut Resources) {
