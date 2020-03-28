@@ -4,9 +4,11 @@ use crate::components::{LightTag, Transform};
 use crate::engine::{InputEvent, Time, WINDOW_HEIGHT, WINDOW_WIDTH};
 use crate::lighting::{DirectionalLight, PointLight};
 use crate::model::Model;
+use crate::physics::Physics;
 use cgmath::vec3;
 use glfw::{Action, Key};
 use legion::prelude::*;
+use nphysics3d::object::BodyStatus;
 use std::collections::HashMap;
 
 pub trait State {
@@ -44,7 +46,10 @@ impl BasicState {
 const CAMERA_SPEED: f32 = 4.5;
 
 impl State for BasicState {
-    fn start(&mut self, world: &mut World, _resources: &mut Resources) {
+    fn start(&mut self, world: &mut World, resources: &mut Resources) {
+        let physicis = Physics::new(resources);
+        self.systems.push(physicis.system);
+
         let light_positions = vec![
             vec3(0.7, 0.2, 2.0),
             vec3(2.3, -3.3, -4.0),
@@ -105,14 +110,16 @@ impl State for BasicState {
         world.insert(
             (),
             cube_positions.iter().map(|&position| {
+                let transform = Transform {
+                    position,
+                    scale: vec3(1.0, 1.0, 1.0),
+                    rotation: vec3(1.0, 1.0, 1.0),
+                    angle: 0.0,
+                };
                 (
                     Model::cube(),
-                    Transform {
-                        position,
-                        scale: vec3(1.0, 1.0, 1.0),
-                        rotation: vec3(1.0, 1.0, 1.0),
-                        angle: 0.0,
-                    },
+                    Physics::create_cube(resources, &transform, BodyStatus::Dynamic),
+                    transform,
                 )
             }),
         );
@@ -125,7 +132,14 @@ impl State for BasicState {
             angle: 90_f32,
         };
 
-        world.insert((), vec![(floor, floor_transform)]);
+        world.insert(
+            (),
+            vec![(
+                floor,
+                Physics::create_cube(resources, &floor_transform, BodyStatus::Static),
+                floor_transform,
+            )],
+        );
     }
 
     fn update(&mut self, world: &mut World, resources: &mut Resources) {

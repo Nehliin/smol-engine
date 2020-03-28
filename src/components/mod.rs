@@ -1,9 +1,15 @@
 use cgmath::prelude::*;
 use cgmath::Matrix4;
 use cgmath::{Rad, Vector3};
+use nphysics3d::object::{DefaultBodyHandle, DefaultColliderHandle};
 
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct LightTag;
+
+pub struct PhysicsBody {
+    pub body_handle: DefaultBodyHandle,
+    pub collider_handle: DefaultColliderHandle,
+}
 
 pub struct Transform {
     pub position: Vector3<f32>,

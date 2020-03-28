@@ -8,6 +8,7 @@ mod mesh;
 mod model;
 mod shaders;
 mod state;
+mod physics;
 
 use crate::engine::Engine;
 use crate::graphics::BasicRenderer;
