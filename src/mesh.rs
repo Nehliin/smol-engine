@@ -122,10 +122,7 @@ impl Mesh {
             let number = number - 1;
             // now set the sampler to the correct texture unit
             let sampler = CString::new(format!("material.{}[{}]", name, number as i32)).unwrap();
-            gl::Uniform1i(
-                gl::GetUniformLocation(shader.id, sampler.as_ptr()),
-                i as i32,
-            );
+            shader.set_int(&sampler, i as i32);
             // and finally bind the texture
             gl::BindTexture(gl::TEXTURE_2D, texture.id);
         }

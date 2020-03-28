@@ -80,13 +80,13 @@ impl Model {
 
     pub fn cube() -> Self {
         let texture_diffuse = Texture {
-            id: unsafe { texture_from_file(DIFFUSE_TEXTURE, "") },
+            id: unsafe { texture_from_file(DIFFUSE_TEXTURE, "", true) },
             type_str: "diffuse_textures".to_string(),
             path: DIFFUSE_TEXTURE.to_string(),
         };
 
         let texture_specular = Texture {
-            id: unsafe { texture_from_file(SPECULAR_TEXTURE, "") },
+            id: unsafe { texture_from_file(SPECULAR_TEXTURE, "", false) },
             type_str: "specular_textures".to_string(),
             path: SPECULAR_TEXTURE.to_string(),
         };
@@ -171,8 +171,10 @@ impl Model {
                 return texture.clone();
             }
         }
+        let is_srgb = type_name == "diffuse_textures";
+
         let texture = Texture {
-            id: unsafe { texture_from_file(path, &self.directory) },
+            id: unsafe { texture_from_file(path, &self.directory, is_srgb) },
             type_str: type_name.into(),
             path: path.into(),
         };
@@ -181,7 +183,7 @@ impl Model {
     }
 }
 // TODO: use actual paths here!
-pub unsafe fn texture_from_file(path: &str, directory: &str) -> u32 {
+pub unsafe fn texture_from_file(path: &str, directory: &str, is_srgb: bool) -> u32 {
     let filename = if !directory.is_empty() {
         format!("{}/{}", directory, path)
     } else {
@@ -206,7 +208,7 @@ pub unsafe fn texture_from_file(path: &str, directory: &str) -> u32 {
     gl::TexImage2D(
         gl::TEXTURE_2D,
         0,
-        format as i32,
+        if is_srgb { gl::SRGB } else { format } as i32,
         img.width() as i32,
         img.height() as i32,
         0,

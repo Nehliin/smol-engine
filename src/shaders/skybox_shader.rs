@@ -1,9 +1,7 @@
 use crate::camera::Camera;
 use crate::shaders::Shader;
 use crate::shaders::ShaderSys;
-use cgmath::Matrix3;
 use gl::types::*;
-use image::DynamicImage::*;
 use image::GenericImage;
 use legion::prelude::*;
 use std::ffi::c_void;
@@ -137,7 +135,7 @@ impl SkyBoxShader {
             return Err("Skybox texture directory doesn't contain exactly 6 images".to_string());
         }
         paths.sort();
-        dbg!(&paths);
+
         gl::GenTextures(1, &mut self.texture);
         gl::BindTexture(gl::TEXTURE_CUBE_MAP, self.texture);
 
