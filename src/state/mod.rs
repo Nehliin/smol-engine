@@ -35,8 +35,8 @@ impl BasicState {
         BasicState {
             systems: Vec::new(),
             first_mouse: true,
-            last_y: (WINDOW_HEIGHT / 2) as f32, // ugly
-            last_x: (WINDOW_WIDTH / 2) as f32,  // ugly
+            last_y: (WINDOW_HEIGHT / 2) as f32, // TODO: ugly
+            last_x: (WINDOW_WIDTH / 2) as f32,  // TODO: ugly
             key_down_map: HashMap::new(),
         }
     }
@@ -120,7 +120,11 @@ impl State for BasicState {
         world.insert((), vec![(floor, floor_transform)]);
     }
 
-    fn update(&mut self, _world: &mut World, _resources: &mut Resources) {}
+    fn update(&mut self, world: &mut World, resources: &mut Resources) {
+        self.systems
+            .iter_mut()
+            .for_each(|system| system.run(world, resources));
+    }
 
     fn stop(&mut self, _world: &mut World, _resources: &mut Resources) {
         unimplemented!()

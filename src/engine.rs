@@ -96,10 +96,6 @@ impl Engine {
         self.current_state
             .start(&mut self.world, &mut self.resources);
         while !self.window.should_close() {
-            unsafe {
-                gl::ClearColor(0.2, 0.3, 0.3, 1.0);
-                gl::Clear(gl::COLOR_BUFFER_BIT | gl::DEPTH_BUFFER_BIT | gl::STENCIL_BUFFER_BIT);
-            }
             let current_frame = self.glfw.get_time() as f32;
             let delta_time = current_frame - last_frame;
             last_frame = current_frame;
