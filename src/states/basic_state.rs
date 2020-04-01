@@ -1,5 +1,5 @@
 use crate::camera::Camera;
-use crate::components::Selected;
+//use crate::components::Selected;
 use crate::components::{LightTag, Transform};
 use crate::engine::{InputEvent, Time, WINDOW_HEIGHT, WINDOW_WIDTH};
 use crate::lighting::{DirectionalLight, PointLight};
@@ -8,24 +8,14 @@ use crate::physics::Physics;
 use glfw::{Action, Key};
 use legion::prelude::*;
 use nalgebra::{Isometry3, Vector3};
+
 use nphysics3d::object::BodyStatus;
 use std::collections::HashMap;
 
-pub trait State {
-    // resources??
-    fn start(&mut self, world: &mut World, resources: &mut Resources);
-    fn update(&mut self, world: &mut World, resources: &mut Resources); // -> transition
-    fn stop(&mut self, world: &mut World, resources: &mut Resources);
-    fn handle_event(
-        &mut self,
-        event: InputEvent,
-        world: &mut World,
-        resources: &mut Resources,
-    ) -> bool;
-}
+use super::State;
 
 pub struct BasicState {
-    systems: Vec<Box<dyn Schedulable>>,
+    schedule: Option<Schedule>,
     first_mouse: bool,
     last_x: f32,
     last_y: f32,
@@ -35,7 +25,7 @@ pub struct BasicState {
 impl BasicState {
     pub fn new() -> Self {
         BasicState {
-            systems: Vec::new(),
+            schedule: None,
             first_mouse: true,
             last_y: (WINDOW_HEIGHT / 2) as f32, // TODO: ugly
             last_x: (WINDOW_WIDTH / 2) as f32,  // TODO: ugly
@@ -48,7 +38,9 @@ const CAMERA_SPEED: f32 = 4.5;
 impl State for BasicState {
     fn start(&mut self, world: &mut World, resources: &mut Resources) {
         let physicis = Physics::new(resources);
-        self.systems.push(physicis.system);
+        let schedule = Schedule::builder().add_system(physicis.system).build();
+
+        self.schedule = Some(schedule);
 
         let light_positions = vec![
             Vector3::new(0.7, 0.2, 2.0),
@@ -135,9 +127,10 @@ impl State for BasicState {
     }
 
     fn update(&mut self, world: &mut World, resources: &mut Resources) {
-        self.systems
-            .iter_mut()
-            .for_each(|system| system.run(world, resources));
+        self.schedule
+            .as_mut()
+            .expect("to be initializes")
+            .execute(world, resources);
     }
 
     fn stop(&mut self, _world: &mut World, _resources: &mut Resources) {
@@ -148,7 +141,7 @@ impl State for BasicState {
     fn handle_event(
         &mut self,
         event: InputEvent,
-        _world: &mut World,
+        world: &mut World,
         resources: &mut Resources,
     ) -> bool {
         match event {
@@ -178,6 +171,27 @@ impl State for BasicState {
                     self.key_down_map.insert(key, false);
                 }
 
+                false
+            }
+            InputEvent::MouseButton { button, action } => {
+                if action == Action::Press {
+                    let transform = {
+                        let camera = resources.get::<Camera>().unwrap();
+                        Transform::from_position(Vector3::new(
+                            camera.get_position().x,
+                            camera.get_position().y,
+                            camera.get_position().z - 3.0,
+                        ))
+                    };
+                    world.insert(
+                        (),
+                        vec![(
+                            Physics::create_sphere(resources, &transform, BodyStatus::Dynamic, 1.0),
+                            transform,
+                            Model::sphere(2.0),
+                        )],
+                    );
+                }
                 false
             }
             InputEvent::CursorMovement { x_pos, y_pos } => {

@@ -1,7 +1,7 @@
 use crate::camera::Camera;
 use crate::graphics::Renderer;
-use crate::state::State;
-use glfw::{Action, Context, Glfw, Key, Window, WindowEvent};
+use crate::states::State;
+use glfw::{Action, Context, Glfw, Key, MouseButton, Window, WindowEvent};
 use legion::prelude::*;
 use nalgebra::{Point3, Vector3};
 use std::sync::mpsc::Receiver;
@@ -10,6 +10,7 @@ use std::sync::mpsc::Receiver;
 pub enum InputEvent {
     KeyAction { key: Key, action: Action },
     CursorMovement { x_pos: f64, y_pos: f64 },
+    MouseButton { button: MouseButton, action: Action },
 }
 
 pub struct Time {
@@ -61,6 +62,7 @@ impl Engine {
         window.make_current();
         window.set_key_polling(true);
         window.set_cursor_pos_polling(true);
+        window.set_mouse_button_polling(true);
         window.set_cursor_mode(glfw::CursorMode::Disabled);
         window.set_framebuffer_size_polling(true);
 
@@ -136,6 +138,13 @@ impl Engine {
                 glfw::WindowEvent::CursorPos(x_pos, y_pos) => {
                     self.current_state.handle_event(
                         InputEvent::CursorMovement { x_pos, y_pos },
+                        &mut self.world,
+                        &mut self.resources,
+                    );
+                }
+                glfw::WindowEvent::MouseButton(button, action, _) => {
+                    self.current_state.handle_event(
+                        InputEvent::MouseButton { button, action },
                         &mut self.world,
                         &mut self.resources,
                     );

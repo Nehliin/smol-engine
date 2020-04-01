@@ -106,6 +106,65 @@ impl Model {
         }
     }
 
+    pub fn sphere(radius: f32) -> Self {
+        // let texture_diffuse = Texture {
+        //     id: unsafe { texture_from_file(DIFFUSE_TEXTURE, "", true) },
+        //     type_str: "diffuse_textures".to_string(),
+        //     path: DIFFUSE_TEXTURE.to_string(),
+        // };
+
+        // let texture_specular = Texture {
+        //     id: unsafe { texture_from_file(SPECULAR_TEXTURE, "", false) },
+        //     type_str: "specular_textures".to_string(),
+        //     path: SPECULAR_TEXTURE.to_string(),
+        // };
+
+        const X_SEGMENTS: u32 = 64;
+        const Y_SEGMENTS: u32 = 64;
+        use std::f32::consts::PI;
+        let mut verticies = Vec::new();
+
+        for y in 0..=Y_SEGMENTS {
+            for x in 0..=X_SEGMENTS {
+                let x_segment = x as f32 / X_SEGMENTS as f32;
+                let y_segment = y as f32 / Y_SEGMENTS as f32;
+
+                let xpos = (x_segment * radius * PI).cos() * (y_segment * PI).sin();
+                let ypos = (y_segment * PI).cos();
+                let zpos = (x_segment * radius * PI).sin() * (y_segment * PI).sin();
+
+                verticies.push(Vertex {
+                    position: Vector3::new(xpos, ypos, zpos),
+                    normal: Vector3::new(xpos, ypos, zpos),
+                    tex_coords: Vector2::new(x_segment, y_segment),
+                });
+            }
+        }
+        let mut indicies = Vec::new();
+        let mut odd_row = false;
+        for y in 0..Y_SEGMENTS {
+            if !odd_row {
+                for x in 0..=X_SEGMENTS {
+                    indicies.push(y * (X_SEGMENTS + 1) + x);
+                    indicies.push((y + 1) * (X_SEGMENTS + 1) + x);
+                }
+            } else {
+                for x in (0..=X_SEGMENTS).rev() {
+                    indicies.push((y + 1) * (X_SEGMENTS + 1) + x);
+                    indicies.push(y * (X_SEGMENTS + 1) + x);
+                }
+            }
+            odd_row = !odd_row;
+        }
+
+        let mesh = Mesh::new_indexed(verticies, indicies, vec![]);
+        Model {
+            meshes: vec![mesh],
+            directory: String::new(),
+            textures_loaded: Vec::new(),
+        }
+    }
+
     pub unsafe fn draw(&self, shader: &mut Shader) {
         self.meshes.iter().for_each(|mesh| {
             mesh.draw(shader);

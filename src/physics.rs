@@ -2,7 +2,7 @@ use crate::components::{PhysicsBody, Transform};
 
 use legion::prelude::*;
 use nalgebra::Vector3;
-use ncollide3d::shape::{Cuboid, ShapeHandle};
+use ncollide3d::shape::{Ball, Cuboid, ShapeHandle};
 use nphysics3d::force_generator::DefaultForceGeneratorSet;
 use nphysics3d::joint::DefaultJointConstraintSet;
 use nphysics3d::object::{
@@ -81,6 +81,40 @@ impl Physics {
             transform.scale.y / 2.0,
             transform.scale.z / 2.0,
         )));
+
+        let collider = ColliderDesc::new(shape)
+            .density(1.0)
+            .build(BodyPartHandle(body_handle, 0));
+
+        let mut collider_set = resources
+            .get_mut::<DefaultColliderSet<f32>>()
+            .expect("Collider set not added to resources yet");
+
+        let collider_handle = collider_set.insert(collider);
+
+        PhysicsBody {
+            body_handle,
+            collider_handle,
+        }
+    }
+
+    pub fn create_sphere(
+        resources: &mut Resources,
+        transform: &Transform,
+        body_status: BodyStatus,
+        radius: f32,
+    ) -> PhysicsBody {
+        let sphere_body = RigidBodyDesc::new()
+            .position(transform.isometry)
+            .status(body_status)
+            .mass(3.0)
+            .build();
+        let mut body_set = resources
+            .get_mut::<DefaultBodySet<f32>>()
+            .expect("Default body set not added as a resource");
+        let body_handle = body_set.insert(sphere_body);
+
+        let shape = ShapeHandle::new(Ball::new(radius));
 
         let collider = ColliderDesc::new(shape)
             .density(1.0)

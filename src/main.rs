@@ -6,13 +6,13 @@ mod lighting;
 pub mod macros;
 mod mesh;
 mod model;
-mod shaders;
-mod state;
 mod physics;
+mod shaders;
+mod states;
 
 use crate::engine::Engine;
 use crate::graphics::BasicRenderer;
-use crate::state::BasicState;
+use crate::states::BasicState;
 
 #[global_allocator]
 static GLOBAL: jemallocator::Jemalloc = jemallocator::Jemalloc;

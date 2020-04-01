@@ -1,4 +1,4 @@
-use nalgebra::{zero, Isometry3, Matrix4, Unit, Vector3};
+use nalgebra::{Isometry3, Matrix4, Vector3};
 use nphysics3d::object::{DefaultBodyHandle, DefaultColliderHandle};
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct LightTag;
