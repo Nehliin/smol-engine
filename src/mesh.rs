@@ -1,13 +1,9 @@
 #![allow(dead_code)]
 
+use crate::shaders::Shader;
+use nalgebra::{Vector2, Vector3};
 use std::ffi::CString;
 use std::os::raw::c_void;
-
-use cgmath::prelude::*;
-use cgmath::{Vector2, Vector3};
-use gl;
-
-use crate::shaders::Shader;
 
 // NOTE: without repr(C) the compiler may reorder the fields or use different padding/alignment than C.
 // Depending on how you pass the data to OpenGL, this may be bad. In this case it's not strictly
@@ -25,9 +21,9 @@ pub struct Vertex {
 impl Default for Vertex {
     fn default() -> Self {
         Vertex {
-            position: Vector3::zero(),
-            normal: Vector3::zero(),
-            tex_coords: Vector2::zero(),
+            position: Vector3::new(0.0, 0.0, 0.0),
+            normal: Vector3::new(0.0, 0.0, 0.0),
+            tex_coords: Vector2::new(0.0, 0.0),
         }
     }
 }

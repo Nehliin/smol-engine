@@ -1,29 +1,21 @@
 use crate::camera::Camera;
-use crate::components::Selected;
+//use crate::components::Selected;
 use crate::components::{LightTag, Transform};
 use crate::engine::{InputEvent, Time, WINDOW_HEIGHT, WINDOW_WIDTH};
 use crate::lighting::{DirectionalLight, PointLight};
 use crate::model::Model;
-use cgmath::vec3;
+use crate::physics::Physics;
 use glfw::{Action, Key};
 use legion::prelude::*;
+use nalgebra::{Isometry3, Vector3};
+
+use nphysics3d::object::BodyStatus;
 use std::collections::HashMap;
 
-pub trait State {
-    // resources??
-    fn start(&mut self, world: &mut World, resources: &mut Resources);
-    fn update(&mut self, world: &mut World, resources: &mut Resources); // -> transition
-    fn stop(&mut self, world: &mut World, resources: &mut Resources);
-    fn handle_event(
-        &mut self,
-        event: InputEvent,
-        world: &mut World,
-        resources: &mut Resources,
-    ) -> bool;
-}
+use super::State;
 
 pub struct BasicState {
-    systems: Vec<Box<dyn Schedulable>>,
+    schedule: Option<Schedule>,
     first_mouse: bool,
     last_x: f32,
     last_y: f32,
@@ -33,7 +25,7 @@ pub struct BasicState {
 impl BasicState {
     pub fn new() -> Self {
         BasicState {
-            systems: Vec::new(),
+            schedule: None,
             first_mouse: true,
             last_y: (WINDOW_HEIGHT / 2) as f32, // TODO: ugly
             last_x: (WINDOW_WIDTH / 2) as f32,  // TODO: ugly
@@ -44,23 +36,26 @@ impl BasicState {
 const CAMERA_SPEED: f32 = 4.5;
 
 impl State for BasicState {
-    fn start(&mut self, world: &mut World, _resources: &mut Resources) {
+    fn start(&mut self, world: &mut World, resources: &mut Resources) {
+        let physicis = Physics::new(resources);
+        let schedule = Schedule::builder().add_system(physicis.system).build();
+
+        self.schedule = Some(schedule);
+
         let light_positions = vec![
-            vec3(0.7, 0.2, 2.0),
-            vec3(2.3, -3.3, -4.0),
-            vec3(-4.0, 2.0, -12.0),
-            vec3(0.0, 0.0, -3.0),
+            Vector3::new(0.7, 0.2, 2.0),
+            Vector3::new(2.3, -3.3, -4.0),
+            Vector3::new(-4.0, 2.0, -12.0),
+            Vector3::new(0.0, 0.0, -3.0),
         ];
 
         world.insert(
             (), // selected
             vec![(
-                Transform {
-                    position: vec3(0.0, -1.75, 0.0),
-                    scale: vec3(0.2, 0.2, 0.2),
-                    rotation: vec3(1.0, 1.0, 1.0),
-                    angle: 0.0,
-                },
+                Transform::new(
+                    Isometry3::translation(0.0, -1.75, 0.0),
+                    Vector3::new(0.2, 0.2, 0.2),
+                ),
                 Model::new("nanosuit/nanosuit.obj"),
             )],
         );
@@ -68,7 +63,7 @@ impl State for BasicState {
         world.insert(
             (LightTag, ()),
             vec![(
-                DirectionalLight::default().set_diffuse(vec3(0.0, 0.0, 1.0)),
+                DirectionalLight::default().set_diffuse(Vector3::new(0.0, 0.0, 1.0)),
                 (),
             )],
         );
@@ -77,12 +72,10 @@ impl State for BasicState {
             (LightTag, ()), // <--- maybe shader tag here?
             light_positions.iter().map(|&position| {
                 (
-                    Transform {
-                        position,
-                        scale: vec3(0.5, 0.5, 0.5),
-                        rotation: vec3(1.0, 1.0, 1.0),
-                        angle: 0.0,
-                    },
+                    Transform::new(
+                        Isometry3::translation(position.x, position.y, position.z),
+                        Vector3::new(0.5, 0.5, 0.5),
+                    ),
                     Model::cube(),
                     PointLight::default(),
                 )
@@ -90,48 +83,54 @@ impl State for BasicState {
         );
 
         let cube_positions = vec![
-            vec3(0.0, -3.0, 0.0),
-            vec3(2.0, 5.0, -15.0),
-            vec3(-1.5, -2.2, -2.5),
-            vec3(-3.8, -2.0, -12.0),
-            vec3(2.4, -0.4, -3.5),
-            vec3(-1.7, 3.0, -7.5),
-            vec3(1.3, -2.0, -2.5),
-            vec3(1.5, 2.0, -2.5),
-            vec3(1.5, 0.2, -1.5),
-            vec3(-1.3, 1.0, -1.5),
+            Vector3::new(0.0, -3.0, 0.0),
+            Vector3::new(2.0, 5.0, -15.0),
+            Vector3::new(-1.5, -2.2, -2.5),
+            Vector3::new(-3.8, -2.0, -12.0),
+            Vector3::new(2.4, -0.4, -3.5),
+            Vector3::new(-1.7, 3.0, -7.5),
+            Vector3::new(1.3, -2.0, -2.5),
+            Vector3::new(1.5, 2.0, -2.5),
+            Vector3::new(1.5, 0.2, -1.5),
+            Vector3::new(-1.3, 1.0, -1.5),
         ];
 
         world.insert(
             (),
             cube_positions.iter().map(|&position| {
+                let transform = Transform::from_position(position);
                 (
                     Model::cube(),
-                    Transform {
-                        position,
-                        scale: vec3(1.0, 1.0, 1.0),
-                        rotation: vec3(1.0, 1.0, 1.0),
-                        angle: 0.0,
-                    },
+                    Physics::create_cube(resources, &transform, BodyStatus::Dynamic),
+                    transform,
                 )
             }),
         );
 
         let floor = Model::cube();
-        let floor_transform = Transform {
-            position: vec3(0.0, -5.0, -2.0),
-            scale: vec3(0.1, 10.0, 10.0),
-            rotation: vec3(0.0, 0.0, 1.0),
-            angle: 90_f32,
-        };
+        let floor_transform = Transform::new(
+            Isometry3::new(
+                Vector3::new(0.0, -5.0, -2.0),
+                Vector3::z() * 90.0_f32.to_radians(),
+            ),
+            Vector3::new(0.1, 10.0, 10.0),
+        );
 
-        world.insert((), vec![(floor, floor_transform)]);
+        world.insert(
+            (),
+            vec![(
+                floor,
+                Physics::create_cube(resources, &floor_transform, BodyStatus::Static),
+                floor_transform,
+            )],
+        );
     }
 
     fn update(&mut self, world: &mut World, resources: &mut Resources) {
-        self.systems
-            .iter_mut()
-            .for_each(|system| system.run(world, resources));
+        self.schedule
+            .as_mut()
+            .expect("to be initializes")
+            .execute(world, resources);
     }
 
     fn stop(&mut self, _world: &mut World, _resources: &mut Resources) {
@@ -142,7 +141,7 @@ impl State for BasicState {
     fn handle_event(
         &mut self,
         event: InputEvent,
-        _world: &mut World,
+        world: &mut World,
         resources: &mut Resources,
     ) -> bool {
         match event {
@@ -174,6 +173,27 @@ impl State for BasicState {
 
                 false
             }
+            InputEvent::MouseButton { button, action } => {
+                if action == Action::Press {
+                    let transform = {
+                        let camera = resources.get::<Camera>().unwrap();
+                        Transform::from_position(Vector3::new(
+                            camera.get_position().x,
+                            camera.get_position().y,
+                            camera.get_position().z - 3.0,
+                        ))
+                    };
+                    world.insert(
+                        (),
+                        vec![(
+                            Physics::create_sphere(resources, &transform, BodyStatus::Dynamic, 1.0),
+                            transform,
+                            Model::sphere(2.0),
+                        )],
+                    );
+                }
+                false
+            }
             InputEvent::CursorMovement { x_pos, y_pos } => {
                 let mut camera = resources.get_mut::<Camera>().unwrap();
                 let (xpos, ypos) = (x_pos as f32, y_pos as f32);
@@ -188,7 +208,7 @@ impl State for BasicState {
                 self.last_x = xpos;
                 self.last_y = ypos;
 
-                let sensitivity: f32 = 0.001; // change this value to your liking
+                let sensitivity: f32 = 0.05; // change this value to your liking
                 xoffset *= sensitivity;
                 yoffset *= sensitivity;
                 let yaw = camera.get_yaw();

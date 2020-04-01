@@ -2,11 +2,10 @@ use crate::mesh::Mesh;
 use crate::mesh::Texture;
 use crate::mesh::Vertex;
 use crate::shaders::Shader;
-use cgmath::vec2;
-use cgmath::vec3;
 use core::ffi::c_void;
 use image::DynamicImage::*;
 use image::GenericImage;
+use nalgebra::{Vector2, Vector3};
 use std::path::Path;
 
 // trash structure
@@ -94,12 +93,71 @@ impl Model {
         let verticies = VERTICIES
             .chunks_exact(8)
             .map(|chunk| Vertex {
-                position: vec3(chunk[0], chunk[1], chunk[2]),
-                normal: vec3(chunk[3], chunk[4], chunk[5]),
-                tex_coords: vec2(chunk[6], chunk[7]),
+                position: Vector3::new(chunk[0], chunk[1], chunk[2]),
+                normal: Vector3::new(chunk[3], chunk[4], chunk[5]),
+                tex_coords: Vector2::new(chunk[6], chunk[7]),
             })
             .collect();
         let mesh = Mesh::new_unindexed(verticies, vec![texture_diffuse, texture_specular]);
+        Model {
+            meshes: vec![mesh],
+            directory: String::new(),
+            textures_loaded: Vec::new(),
+        }
+    }
+
+    pub fn sphere(radius: f32) -> Self {
+        // let texture_diffuse = Texture {
+        //     id: unsafe { texture_from_file(DIFFUSE_TEXTURE, "", true) },
+        //     type_str: "diffuse_textures".to_string(),
+        //     path: DIFFUSE_TEXTURE.to_string(),
+        // };
+
+        // let texture_specular = Texture {
+        //     id: unsafe { texture_from_file(SPECULAR_TEXTURE, "", false) },
+        //     type_str: "specular_textures".to_string(),
+        //     path: SPECULAR_TEXTURE.to_string(),
+        // };
+
+        const X_SEGMENTS: u32 = 64;
+        const Y_SEGMENTS: u32 = 64;
+        use std::f32::consts::PI;
+        let mut verticies = Vec::new();
+
+        for y in 0..=Y_SEGMENTS {
+            for x in 0..=X_SEGMENTS {
+                let x_segment = x as f32 / X_SEGMENTS as f32;
+                let y_segment = y as f32 / Y_SEGMENTS as f32;
+
+                let xpos = (x_segment * radius * PI).cos() * (y_segment * PI).sin();
+                let ypos = (y_segment * PI).cos();
+                let zpos = (x_segment * radius * PI).sin() * (y_segment * PI).sin();
+
+                verticies.push(Vertex {
+                    position: Vector3::new(xpos, ypos, zpos),
+                    normal: Vector3::new(xpos, ypos, zpos),
+                    tex_coords: Vector2::new(x_segment, y_segment),
+                });
+            }
+        }
+        let mut indicies = Vec::new();
+        let mut odd_row = false;
+        for y in 0..Y_SEGMENTS {
+            if !odd_row {
+                for x in 0..=X_SEGMENTS {
+                    indicies.push(y * (X_SEGMENTS + 1) + x);
+                    indicies.push((y + 1) * (X_SEGMENTS + 1) + x);
+                }
+            } else {
+                for x in (0..=X_SEGMENTS).rev() {
+                    indicies.push((y + 1) * (X_SEGMENTS + 1) + x);
+                    indicies.push(y * (X_SEGMENTS + 1) + x);
+                }
+            }
+            odd_row = !odd_row;
+        }
+
+        let mesh = Mesh::new_indexed(verticies, indicies, vec![]);
         Model {
             meshes: vec![mesh],
             directory: String::new(),
@@ -135,9 +193,13 @@ impl Model {
 
             for i in 0..num_vertices {
                 vertices.push(Vertex {
-                    position: vec3(positions[i * 3], positions[i * 3 + 1], positions[i * 3 + 2]),
-                    normal: vec3(normals[i * 3], normals[i * 3 + 1], normals[i * 3 + 2]),
-                    tex_coords: vec2(tex_coords[i * 2], tex_coords[i * 2 + 1]),
+                    position: Vector3::new(
+                        positions[i * 3],
+                        positions[i * 3 + 1],
+                        positions[i * 3 + 2],
+                    ),
+                    normal: Vector3::new(normals[i * 3], normals[i * 3 + 1], normals[i * 3 + 2]),
+                    tex_coords: Vector2::new(tex_coords[i * 2], tex_coords[i * 2 + 1]),
                 })
             }
 

@@ -1,8 +1,7 @@
 #![allow(dead_code)]
 
 use crate::lighting::Strength;
-use cgmath::vec3;
-use cgmath::Vector3;
+use nalgebra::Vector3;
 
 pub struct SpotLight {
     pub direction: Vector3<f32>,
@@ -26,11 +25,11 @@ impl Default for SpotLight {
         let quadratic = 0.032;
 
         SpotLight {
-            direction: vec3(0.0, -1.0, 0.0),
-            position: vec3(0.0, 0.0, 0.0),
-            ambient: vec3(0.1, 0.1, 0.1),
-            specular: vec3(1.0, 1.0, 1.0),
-            diffuse: vec3(1.0, 1.0, 1.0),
+            direction: Vector3::new(0.0, -1.0, 0.0),
+            position: Vector3::new(0.0, 0.0, 0.0),
+            ambient: Vector3::new(0.1, 0.1, 0.1),
+            specular: Vector3::new(1.0, 1.0, 1.0),
+            diffuse: Vector3::new(1.0, 1.0, 1.0),
             constant,
             linear,
             quadratic,

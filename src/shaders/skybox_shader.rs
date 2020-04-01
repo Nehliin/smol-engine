@@ -4,10 +4,10 @@ use crate::shaders::ShaderSys;
 use gl::types::*;
 use image::GenericImage;
 use legion::prelude::*;
+
 use std::ffi::c_void;
 use std::ffi::CString;
 use std::path::Path;
-
 // Note the lack of texture coordinates here
 // OpenGL uses local coordinates to figure out where
 // each texel should be mapped to for cubetextures
@@ -80,14 +80,6 @@ impl SkyBoxShader {
         };
         unsafe {
             skybox.generate_cube();
-            /*skybox.texture = SkyBoxShader::loadCubemap(&vec![
-                "skybox/1.jpg",
-                "skybox/2.jpg",
-                "skybox/3.jpg",
-                "skybox/4.jpg",
-                "skybox/5.jpg",
-                "skybox/6.jpg",
-            ]);*/
             skybox.load_textures().unwrap();
             skybox.shader.use_program();
             skybox
@@ -216,9 +208,10 @@ impl ShaderSys for SkyBoxShader {
                     &camera.get_projection_matrix(),
                 );
                 let mut view_matrix = *camera.get_view_matrix();
-                view_matrix.w[0] = 0.0;
-                view_matrix.w[1] = 0.0;
-                view_matrix.w[2] = 0.0;
+                let mut col = view_matrix.column_mut(3);
+                col[0] = 0.0;
+                col[1] = 0.0;
+                col[2] = 0.0;
                 skybox_shader
                     .shader
                     .set_mat4(&CString::new("view").unwrap(), &view_matrix);

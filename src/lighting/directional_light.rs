@@ -1,6 +1,5 @@
 use crate::shaders::Shader;
-use cgmath::vec3;
-use cgmath::Vector3;
+use nalgebra::Vector3;
 use std::ffi::CString;
 
 pub struct DirectionalLight {
@@ -13,10 +12,10 @@ pub struct DirectionalLight {
 impl Default for DirectionalLight {
     fn default() -> Self {
         DirectionalLight {
-            direction: vec3(0.0, -1.0, 0.0),
-            ambient: vec3(0.1, 0.1, 0.1),
-            specular: vec3(1.0, 1.0, 1.0),
-            diffuse: vec3(1.0, 1.0, 1.0),
+            direction: Vector3::new(0.0, -1.0, 0.0),
+            ambient: Vector3::new(0.1, 0.1, 0.1),
+            specular: Vector3::new(1.0, 1.0, 1.0),
+            diffuse: Vector3::new(1.0, 1.0, 1.0),
         }
     }
 }
