@@ -11,7 +11,7 @@ mod shaders;
 mod states;
 
 use crate::engine::Engine;
-use crate::graphics::BasicRenderer;
+//use crate::graphics::BasicRenderer;
 use crate::states::BasicState;
 
 #[global_allocator]
@@ -21,7 +21,7 @@ fn main() {
     let mut engine = Engine::new(
         "Smol engine",
         Box::new(BasicState::new()),
-        Box::new(BasicRenderer::new()),
+        //   BasicRenderer::new(),
     );
     engine.run();
 }

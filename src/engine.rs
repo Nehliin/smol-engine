@@ -1,5 +1,5 @@
 use crate::camera::Camera;
-use crate::graphics::Renderer;
+use crate::graphics::{Renderer, WgpuRenderer};
 use crate::states::State;
 use glfw::{Action, Context, Glfw, Key, MouseButton, Window, WindowEvent};
 use legion::prelude::*;
@@ -19,7 +19,8 @@ pub struct Time {
 }
 
 pub struct Engine {
-    renderer: Box<dyn Renderer>,
+    // renderer: R,
+    tmp_wgpu_renderer: WgpuRenderer,
     current_state: Box<dyn State>,
     // ECS
     world: World,
@@ -35,20 +36,18 @@ pub const WINDOW_WIDTH: u32 = 1600;
 
 impl Engine {
     // TODO: make builder instead
-    pub fn new(
-        name: impl AsRef<str>,
-        start_state: Box<dyn State>,
-        mut renderer: Box<dyn Renderer>,
-    ) -> Self {
+    pub fn new(name: impl AsRef<str>, start_state: Box<dyn State>) -> Self {
         let mut glfw = glfw::init(glfw::FAIL_ON_ERRORS).unwrap();
-        glfw.window_hint(glfw::WindowHint::ContextVersion(3, 3));
+        // put this behind a feature flag!
+        /*glfw.window_hint(glfw::WindowHint::ContextVersion(3, 3));
         glfw.window_hint(glfw::WindowHint::OpenGlProfile(
             glfw::OpenGlProfileHint::Core,
         ));
         #[cfg(target_os = "macos")]
-        glfw.window_hint(glfw::WindowHint::OpenGlForwardCompat(true));
+        glfw.window_hint(glfw::WindowHint::OpenGlForwardCompat(true));*/
         // MSAA
-        glfw.window_hint(glfw::WindowHint::Samples(Some(4)));
+        glfw.window_hint(glfw::WindowHint::ClientApi(glfw::ClientApiHint::NoApi));
+        //    glfw.window_hint(glfw::WindowHint::Samples(Some(4))); <- better to do manually
 
         let (mut window, events) = glfw
             .create_window(
@@ -58,15 +57,14 @@ impl Engine {
                 glfw::WindowMode::Windowed,
             )
             .expect("Failed to create window");
-
-        window.make_current();
+        //window.make_current();
         window.set_key_polling(true);
         window.set_cursor_pos_polling(true);
         window.set_mouse_button_polling(true);
         window.set_cursor_mode(glfw::CursorMode::Disabled);
         window.set_framebuffer_size_polling(true);
-
-        gl::load_with(|symbol| window.get_proc_address(symbol) as *const _);
+        // cfg this !
+        // gl::load_with(|symbol| window.get_proc_address(symbol) as *const _);
 
         // ECS initialization
         let universe = Universe::new();
@@ -77,17 +75,19 @@ impl Engine {
             current_time: glfw.get_time() as f32,
             delta_time: 0.0,
         });
-        renderer.init(&mut resources);
-        println!("RENDERER INITIALIZED!");
+        let wgpu_renderer = WgpuRenderer::new(&window);
+        // renderer.init(&mut resources);
+        //println!("RENDERER INITIALIZED!");
         let camera = Camera::new(
             Point3::new(0., 0., 3.),
-            Vector3::new(0., 0., -1.),
+            Vector3::new(0.0, 0.0, -1.0),
             WINDOW_WIDTH,
             WINDOW_HEIGHT,
         );
         resources.insert(camera);
         Engine {
-            renderer,
+            //       renderer,
+            tmp_wgpu_renderer: wgpu_renderer,
             current_state: start_state,
             world,
             resources,
@@ -99,8 +99,8 @@ impl Engine {
     // Run the main game loop
     pub fn run(&mut self) {
         let mut last_frame = 0.0;
-        self.current_state
-            .start(&mut self.world, &mut self.resources);
+        //self.current_state
+        //  .start(&mut self.world, &mut self.resources);
         while !self.window.should_close() {
             let current_frame = self.glfw.get_time() as f32;
             let delta_time = current_frame - last_frame;
@@ -111,11 +111,12 @@ impl Engine {
                 time.current_time = current_frame;
             }
             self.process_events();
-            self.current_state
-                .update(&mut self.world, &mut self.resources);
-            self.renderer
-                .render_world(&mut self.world, &mut self.resources);
-            self.window.swap_buffers();
+            //self.current_state
+            //  .update(&mut self.world, &mut self.resources);
+            self.tmp_wgpu_renderer.render();
+            //self.renderer
+            //  .render_world(&mut self.world, &mut self.resources);
+            // self.window.swap_buffers();
             self.glfw.poll_events();
         }
     }
@@ -124,7 +125,7 @@ impl Engine {
         for (_, event) in glfw::flush_messages(&self.events) {
             match event {
                 glfw::WindowEvent::FramebufferSize(width, height) => unsafe {
-                    gl::Viewport(0, 0, width, height)
+                    //  gl::Viewport(0, 0, width, height)
                 },
                 glfw::WindowEvent::Key(key, _, action, _) => {
                     if self.current_state.handle_event(

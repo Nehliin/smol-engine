@@ -22,8 +22,12 @@ jemallocator = "0.3"
 nalgebra = "0.20"
 ncollide3d = "0.22"
 nphysics3d = "0.14"
+wgpu = {version = "0.4", features = ["vulkan"]}
+glsl-to-spirv = "0.1"
+anyhow = "1.0.28"
 gl = "0.14"
 glfw = "0.36"
 image = "0.19"
 tobj = "0.1.12"
 legion =  {git = "https://github.com/TomGillen/legion.git"}
+
