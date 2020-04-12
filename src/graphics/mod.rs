@@ -1,5 +1,6 @@
 use legion::prelude::{Resources, World};
 
+pub mod model;
 pub mod pass;
 pub mod texture;
 
@@ -18,7 +19,7 @@ pub trait Renderer {
     // This will initalize the renderer equivalent to ::new() on open gl renderer
     // This also takes a window where the open gl renderer can for example load
     // gl symbols, the wgpu renderer will create surface and devices here etc
-    fn new(window: &Window, resource: &mut Resources) -> Self;
+    fn new(window: &Window, resources: &mut Resources) -> Self;
     // called when a resize event is discovered
     fn resize(&mut self, width: u32, height: u32);
     // actually renders the frame

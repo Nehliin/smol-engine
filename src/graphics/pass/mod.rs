@@ -1,5 +1,5 @@
 use legion::prelude::{Resources, World};
-use wgpu::{CommandEncoder, CreateBufferMapped};
+use wgpu::{CommandBuffer, CommandEncoder, CreateBufferMapped};
 use wgpu::{Device, SwapChainOutput, Texture};
 
 pub mod model_pass;
@@ -10,7 +10,13 @@ pub trait Pass {
         &mut self,
         world: &World,
         resources: &mut Resources,
+        device: &mut Device,
+    ) -> CommandBuffer;
+    fn draw(
+        &self,
+        world: &World,
+        resources: &mut Resources,
+        frame: &SwapChainOutput,
         encoder: &mut CommandEncoder,
     );
-    fn draw(&self, world: &World, frame: &SwapChainOutput, encoder: &mut CommandEncoder);
 }

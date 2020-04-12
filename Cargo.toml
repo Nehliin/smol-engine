@@ -20,14 +20,16 @@ panic = "abort"
 [dependencies]
 jemallocator = "0.3"
 nalgebra = "0.20"
+nalgebra-glm = "0.7.0"
 ncollide3d = "0.22"
 nphysics3d = "0.14"
-wgpu = {version = "0.4", features = ["vulkan"]}
+wgpu = "0.5"
 glsl-to-spirv = "0.1"
 anyhow = "1.0.28"
-gl = "0.14"
 glfw = "0.36"
 image = "0.19"
 tobj = "0.1.12"
+futures = "0.3"
+zerocopy = "0.3"
 legion =  {git = "https://github.com/TomGillen/legion.git"}
 

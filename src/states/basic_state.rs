@@ -1,9 +1,7 @@
 use crate::camera::Camera;
 //use crate::components::Selected;
-use crate::components::{LightTag, Transform};
+use crate::components::{AssetManager, Cube, LightTag, ModelHandle, Transform};
 use crate::engine::{InputEvent, Time, WINDOW_HEIGHT, WINDOW_WIDTH};
-use crate::lighting::{DirectionalLight, PointLight};
-use crate::model::Model;
 use crate::physics::Physics;
 use glfw::{Action, Key};
 use legion::prelude::*;
@@ -13,6 +11,7 @@ use nphysics3d::object::BodyStatus;
 use std::collections::HashMap;
 
 use super::State;
+use crate::graphics::model::Model;
 
 pub struct BasicState {
     schedule: Option<Schedule>,
@@ -37,7 +36,9 @@ const CAMERA_SPEED: f32 = 4.5;
 
 impl State for BasicState {
     fn start(&mut self, world: &mut World, resources: &mut Resources) {
-        let physicis = Physics::new(resources);
+        let suit_handle = ModelHandle { id: 0 };
+        let cube_handle = ModelHandle { id: 1 };
+        /*let physicis = Physics::new(resources);
         let schedule = Schedule::builder().add_system(physicis.system).build();
 
         self.schedule = Some(schedule);
@@ -123,14 +124,54 @@ impl State for BasicState {
                 Physics::create_cube(resources, &floor_transform, BodyStatus::Static),
                 floor_transform,
             )],
+        );*/
+
+        world.insert(
+            (suit_handle, ()), // selected
+            vec![(Transform::new(
+                Isometry3::translation(0.0, -1.75, 0.0),
+                Vector3::new(0.2, 0.2, 0.2),
+            ),)],
+        );
+        let floor_transform = Transform::new(
+            Isometry3::new(
+                Vector3::new(0.0, -5.0, -2.0),
+                Vector3::z() * 90.0_f32.to_radians(),
+            ),
+            Vector3::new(0.1, 10.0, 10.0),
+        );
+        world.insert((cube_handle, ()), vec![(floor_transform,)]);
+
+        let cube_positions = vec![
+            Vector3::new(0.0, -3.0, 0.0),
+            Vector3::new(2.0, 5.0, -15.0),
+            Vector3::new(-1.5, -2.2, -2.5),
+            Vector3::new(-3.8, -2.0, -12.0),
+            Vector3::new(2.4, -0.4, -3.5),
+            Vector3::new(-1.7, 3.0, -7.5),
+            Vector3::new(1.3, -2.0, -2.5),
+            Vector3::new(1.5, 2.0, -2.5),
+            Vector3::new(1.5, 0.2, -1.5),
+            Vector3::new(-1.3, 1.0, -1.5),
+        ];
+
+        world.insert(
+            (cube_handle, ()),
+            cube_positions.iter().map(|&position| {
+                let transform = Transform::new(
+                    Isometry3::translation(position.x, position.y, position.z),
+                    Vector3::new(0.7, 0.7, 0.7),
+                );
+                (transform,)
+            }),
         );
     }
 
     fn update(&mut self, world: &mut World, resources: &mut Resources) {
-        self.schedule
-            .as_mut()
-            .expect("to be initializes")
-            .execute(world, resources);
+        /* self.schedule
+        .as_mut()
+        .expect("to be initializes")
+        .execute(world, resources);*/
     }
 
     fn stop(&mut self, _world: &mut World, _resources: &mut Resources) {
@@ -174,7 +215,7 @@ impl State for BasicState {
                 false
             }
             InputEvent::MouseButton { button, action } => {
-                if action == Action::Press {
+                /*   if action == Action::Press {
                     let transform = {
                         let camera = resources.get::<Camera>().unwrap();
                         Transform::from_position(Vector3::new(
@@ -191,7 +232,7 @@ impl State for BasicState {
                             Model::sphere(2.0),
                         )],
                     );
-                }
+                }*/
                 false
             }
             InputEvent::CursorMovement { x_pos, y_pos } => {

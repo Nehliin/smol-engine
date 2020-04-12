@@ -1,121 +1,34 @@
-use crate::camera::Camera;
-use crate::graphics::Pass;
-use image::load;
-use legion::prelude::{Resources, World};
-use nalgebra::{Matrix, Matrix4, Vector3};
-use std::slice::from_raw_parts_mut;
+use std::collections::HashMap;
+
+use legion::prelude::*;
+use nalgebra::{Matrix4, Vector3};
 use wgpu::{
-    BindGroup, BindGroupDescriptor, BindGroupLayoutBinding, BindGroupLayoutDescriptor, Binding,
-    BindingResource, BindingType, BlendDescriptor, Buffer, BufferAddress, BufferUsage, Color,
-    ColorStateDescriptor, ColorWrite, CommandEncoder, CommandEncoderDescriptor, CreateBufferMapped,
-    CullMode, Device, FrontFace, IndexFormat, InputStepMode, LoadOp, PipelineLayoutDescriptor,
-    PrimitiveTopology, ProgrammableStageDescriptor, RasterizationStateDescriptor,
-    RenderPassColorAttachmentDescriptor, RenderPassDescriptor, RenderPipeline,
-    RenderPipelineDescriptor, ShaderStage, StoreOp, SwapChainOutput, Texture, TextureFormat,
-    TextureView, VertexAttributeDescriptor, VertexBufferDescriptor, VertexFormat,
+    BindGroupDescriptor, BindGroupLayout, BindGroupLayoutDescriptor, BindGroupLayoutEntry, Binding,
+    BindingResource, BindingType, BlendDescriptor, Buffer, BufferAddress, BufferDescriptor,
+    BufferUsage, Color, ColorStateDescriptor, ColorWrite, CommandBuffer, CommandEncoder,
+    CommandEncoderDescriptor, CreateBufferMapped, CullMode, DepthStencilStateDescriptor, Device,
+    FrontFace, IndexFormat, InputStepMode, LoadOp, PipelineLayoutDescriptor, PrimitiveTopology,
+    ProgrammableStageDescriptor, Queue, RasterizationStateDescriptor, RenderPass,
+    RenderPassColorAttachmentDescriptor, RenderPassDepthStencilAttachmentDescriptor,
+    RenderPassDescriptor, RenderPipeline, RenderPipelineDescriptor, ShaderStage, StoreOp,
+    SwapChainDescriptor, SwapChainOutput, Texture, TextureComponentType, TextureFormat,
+    TextureView, TextureViewDimension, VertexAttributeDescriptor, VertexBufferDescriptor,
+    VertexFormat, VertexStateDescriptor,
 };
 
-// Pass associated type?
-// this is the actual uniform buffer
-// it's available for every shader invocation instead of copying it every time
-#[repr(C)]
-#[derive(Copy, Clone)]
-struct VertexUniforms {
-    view: Matrix4<f32>,
-    projection: Matrix4<f32>,
-}
+use crate::components::{AssetManager, ModelHandle, Transform};
+use crate::graphics::model::MeshVertex;
+use crate::graphics::model::{DrawModel, InstanceData};
+use crate::graphics::wgpu_renderer::{UniformBindGroup, DEPTH_FORMAT};
 
-impl VertexUniforms {
-    fn new() -> Self {
-        VertexUniforms {
-            view: Matrix4::identity(),
-            projection: Matrix4::identity(),
-        }
-    }
-}
-
-trait VBDesc {
+pub trait VBDesc {
     fn desc<'a>() -> VertexBufferDescriptor<'a>;
-}
-
-#[repr(C)]
-#[derive(Copy, Clone)]
-struct InstanceRaw {
-    model: Matrix4<f32>,
-}
-
-impl InstanceRaw {
-    fn new(model: Matrix4<f32>) -> Self {
-        InstanceRaw { model }
-    }
-}
-const FLOAT_SIZE: BufferAddress = std::mem::size_of::<f32>() as BufferAddress;
-
-impl VBDesc for InstanceRaw {
-    fn desc<'a>() -> VertexBufferDescriptor<'a> {
-        VertexBufferDescriptor {
-            stride: std::mem::size_of::<InstanceRaw>() as BufferAddress,
-            step_mode: InputStepMode::Instance,
-            // Note that all of these attributes combined describe the matrix
-            // we can't actually create a single attribute since the size limit
-            // is for floating point values, thus we will need to create 4 rows manually
-            attributes: &[
-                wgpu::VertexAttributeDescriptor {
-                    offset: 0,
-                    format: VertexFormat::Float4,
-                    shader_location: 2,
-                },
-                wgpu::VertexAttributeDescriptor {
-                    offset: FLOAT_SIZE * 4,
-                    format: VertexFormat::Float4,
-                    shader_location: 3,
-                },
-                wgpu::VertexAttributeDescriptor {
-                    offset: FLOAT_SIZE * 4 * 2,
-                    format: VertexFormat::Float4,
-                    shader_location: 4,
-                },
-                wgpu::VertexAttributeDescriptor {
-                    offset: FLOAT_SIZE * 4 * 3,
-                    format: VertexFormat::Float4,
-                    shader_location: 5,
-                },
-            ],
-        }
-    }
-}
-#[repr(C)]
-#[derive(Copy, Clone)]
-struct Vertex {
-    position: Vector3<f32>,
-    normal: Vector3<f32>,
-}
-
-impl VBDesc for Vertex {
-    fn desc<'a>() -> VertexBufferDescriptor<'a> {
-        VertexBufferDescriptor {
-            stride: std::mem::size_of::<Vertex>() as BufferAddress,
-            step_mode: InputStepMode::Vertex,
-            attributes: &[
-                VertexAttributeDescriptor {
-                    offset: 0,
-                    format: VertexFormat::Float3,
-                    shader_location: 0,
-                },
-                VertexAttributeDescriptor {
-                    offset: FLOAT_SIZE * 3,
-                    shader_location: 1,
-                    format: VertexFormat::Float3,
-                },
-            ],
-        }
-    }
 }
 
 // make general over path later
 fn load_shader() -> (Vec<u32>, Vec<u32>) {
-    let vs_src = include_str!("../../shader_files/vs_test_shader.shader");
-    let fs_src = include_str!("../../shader_files/fs_test_shader.shader");
+    let vs_src = include_str!("../../shader_files/vertex.shader");
+    let fs_src = include_str!("../../shader_files/fragment.shader");
 
     let vs_spirv = glsl_to_spirv::compile(vs_src, glsl_to_spirv::ShaderType::Vertex).unwrap();
     let fs_spirv = glsl_to_spirv::compile(fs_src, glsl_to_spirv::ShaderType::Fragment).unwrap();
@@ -124,53 +37,101 @@ fn load_shader() -> (Vec<u32>, Vec<u32>) {
     (vs_data, fs_data)
 }
 
-pub struct ModelPass<'a> {
-    render_pipeline: RenderPipeline,
-    uniforms: VertexUniforms, //<- filled from ecs
-    uniform_buffer: Buffer,
-    uniform_bind_group: BindGroup,
-    staging_buffer: CreateBufferMapped<'a, VertexUniforms>, //instance_buffer: Buffer, // These are vertex attributes
-                                                            //  depth_texture: Texture,
-                                                            //depth_texture_view: TextureView
+/*#[repr(C)]
+#[derive(Copy, Clone)]
+struct InstanceData {
+    pub model: Matrix4<f32>,
 }
 
-impl<'a> ModelPass<'a> {
-    fn new(device: &'a mut wgpu::Device, format: TextureFormat) -> Self {
-        let uniforms = VertexUniforms::new();
-        // These might be better as methods on the vertexUniform struct
-        let uniform_buffer = device
-            .create_buffer_mapped(1, BufferUsage::UNIFORM | BufferUsage::COPY_DST)
-            .fill_from_slice(&[&uniforms]);
+struct InstanceBindGroup {
+    buffer: Buffer,
+    bind_group: BindGroup,
+    bind_group_layout: BindGroupLayout,
+}
 
-        let uniform_bind_group_layout =
-            device.create_bind_group_layout(&BindGroupLayoutDescriptor {
-                bindings: &[
-                    // This is the layout of the uniform buffer
-                    BindGroupLayoutBinding {
-                        binding: 0,
-                        visibility: ShaderStage::VERTEX,
-                        ty: BindingType::UniformBuffer { dynamic: false },
+const MAX_INSTANCE_LENGTH: usize = 100;
+
+impl InstanceBindGroup {
+    pub fn new(device: &mut Device) -> Self {
+        let buffer = device.create_buffer(&BufferDescriptor {
+            label: Some("Instance Buffer"),
+            size: (MAX_INSTANCE_LENGTH * std::mem::size_of::<InstanceData>()) as u64,
+            usage: BufferUsage::STORAGE_READ | BufferUsage::COPY_DST,
+        });
+        let bind_group_layout = device.create_bind_group_layout(&BindGroupLayoutDescriptor {
+            bindings: &[
+                // This is the layout of the uniform buffer
+                BindGroupLayoutEntry {
+                    binding: 0,
+                    visibility: ShaderStage::VERTEX,
+                    ty: BindingType::StorageBuffer {
+                        dynamic: false,
+                        readonly: true,
                     },
-                ],
-            });
-
-        let uniform_bind_group = device.create_bind_group(&BindGroupDescriptor {
-            layout: &uniform_bind_group_layout,
+                },
+            ],
+            label: Some("Instance Bind group layout"),
+        });
+        let bind_group = device.create_bind_group(&BindGroupDescriptor {
+            layout: &bind_group_layout,
             bindings: &[Binding {
                 binding: 0,
                 resource: BindingResource::Buffer {
-                    buffer: &uniform_buffer,
-                    range: 0..std::mem::size_of_val(&uniforms) as BufferAddress,
+                    buffer: &buffer,
+                    range: 0..(std::mem::size_of::<InstanceData>() * MAX_INSTANCE_LENGTH)
+                        as BufferAddress,
                 },
             }],
+            label: Some("Uniform bind group"),
+        });
+        Self {
+            bind_group,
+            buffer,
+            bind_group_layout,
+        }
+    }
+    // Store staging buffer within the pass instead? use mem replace in that case
+    pub fn update(&self, device: &mut Device, transform_data: &[Transform]) -> CommandBuffer {
+        let instance_data = transform_data
+            .iter()
+            .map(|trans| InstanceData {
+                model: trans.get_model_matrix(),
+            })
+            .collect::<Vec<InstanceData>>();
+        let staging_buffer =
+            device.create_buffer_with_data(instance_data.as_bytes(), BufferUsage::COPY_SRC);
+        let mut encoder = device.create_command_encoder(&CommandEncoderDescriptor {
+            label: Some("UniformCameraData staging buffer"),
         });
 
+        encoder.copy_buffer_to_buffer(
+            &staging_buffer,
+            0,
+            &self.buffer,
+            0,
+            std::mem::size_of_val(&instance_data) as BufferAddress,
+        );
+        encoder.finish()
+    }
+}*/
+
+pub struct ModelPass {
+    render_pipeline: RenderPipeline,
+}
+
+impl ModelPass {
+    pub fn new(
+        device: &mut Device,
+        texture_layout: &BindGroupLayout,
+        main_bind_group_layout: &BindGroupLayout,
+        format: TextureFormat,
+    ) -> Self {
         let (vs_data, fs_data) = load_shader();
         let vertex_shader = device.create_shader_module(&vs_data);
         let fragment_shader = device.create_shader_module(&fs_data);
 
         let render_pipeline_layout = device.create_pipeline_layout(&PipelineLayoutDescriptor {
-            bind_group_layouts: &[&uniform_bind_group_layout],
+            bind_group_layouts: &[&texture_layout, main_bind_group_layout],
         });
 
         let render_pipeline = device.create_render_pipeline(&RenderPipelineDescriptor {
@@ -185,7 +146,7 @@ impl<'a> ModelPass<'a> {
             }),
             rasterization_state: Some(RasterizationStateDescriptor {
                 front_face: FrontFace::Ccw,
-                cull_mode: CullMode::None, // TODO: change this
+                cull_mode: CullMode::Back, // TODO: change this
                 depth_bias: 0,
                 depth_bias_slope_scale: 0.0,
                 depth_bias_clamp: 0.0,
@@ -197,69 +158,81 @@ impl<'a> ModelPass<'a> {
                 color_blend: BlendDescriptor::REPLACE,
                 write_mask: ColorWrite::ALL,
             }],
-            depth_stencil_state: None,
-            index_format: IndexFormat::Uint16,
-            vertex_buffers: &[Vertex::desc(), InstanceRaw::desc()],
+            depth_stencil_state: Some(wgpu::DepthStencilStateDescriptor {
+                format: DEPTH_FORMAT,
+                depth_write_enabled: true,
+                depth_compare: wgpu::CompareFunction::Less,
+                stencil_front: wgpu::StencilStateFaceDescriptor::IGNORE,
+                stencil_back: wgpu::StencilStateFaceDescriptor::IGNORE,
+                stencil_read_mask: 0,
+                stencil_write_mask: 0,
+            }),
+            vertex_state: VertexStateDescriptor {
+                index_format: IndexFormat::Uint32,
+                vertex_buffers: &[MeshVertex::desc(), InstanceData::desc()],
+            },
             sample_count: 1,
             sample_mask: !0,
             alpha_to_coverage_enabled: false,
         });
-        let staging_buffer = device.create_buffer_mapped(1, BufferUsage::COPY_DST);
 
-        Self {
-            render_pipeline,
-            uniforms,
-            uniform_buffer,
-            uniform_bind_group,
-            staging_buffer, //depth_texture: (),
-                            //depth_texture_view: ()
+        Self { render_pipeline }
+    }
+
+    pub fn update_instances(
+        resources: &Resources,
+        world: &mut World,
+        encoder: &mut CommandEncoder,
+        device: &mut Device,
+    ) {
+        let mut offsets = HashMap::new();
+        let query = <(Read<Transform>, Tagged<ModelHandle>)>::query();
+        let asset_manager = resources.get::<AssetManager>().unwrap();
+        for chunk in query.iter_chunks(world) {
+            let model = chunk.tag::<ModelHandle>().unwrap();
+            let transforms = chunk.components::<Transform>().unwrap();
+            let transforms = transforms
+                .iter()
+                .map(|trans| trans.as_bytes())
+                .flatten()
+                .copied()
+                .collect::<Vec<u8>>();
+            let offset = *offsets.get(model).unwrap_or(&0);
+            let temp_buf = device.create_buffer_with_data(
+                transforms.as_slice(),
+                BufferUsage::VERTEX | BufferUsage::COPY_SRC,
+            );
+            let instance_buffer = &asset_manager.asset_map.get(model).unwrap().instance_buffer;
+            encoder.copy_buffer_to_buffer(
+                &temp_buf,
+                0,
+                instance_buffer,
+                0,
+                transforms.len() as u64,
+            );
+            offsets.insert(model.clone(), offset + transforms.len() as u64);
         }
     }
-}
 
-impl<'a> Pass for ModelPass<'a> {
-    fn update_uniforms(
-        &mut self,
-        world: &World,
-        resources: &mut Resources,
-        encoder: &mut CommandEncoder,
+    pub fn render<'pass, 'encoder: 'pass>(
+        &'encoder self,
+        main_bind_group: &'encoder UniformBindGroup,
+        asset_manager: &'encoder AssetManager,
+        world: &'encoder mut World,
+        render_pass: &'pass mut RenderPass<'encoder>,
     ) {
-        let camera = resources.get::<Camera>().expect("Camera to exist");
-        self.uniforms.projection = *camera.get_projection_matrix();
-        self.uniforms.view = *camera.get_view_matrix();
-
-        let staging_buffer = self.staging_buffer.fill_from_slice(&[self.uniforms]);
-
-        encoder.copy_buffer_to_buffer(
-            &staging_buffer,
-            0,
-            &self.uniform_buffer,
-            0,
-            std::mem::size_of::<VertexUniforms>() as BufferAddress,
-        );
-    }
-
-    fn draw(&self, world: &World, frame: &SwapChainOutput, encoder: &mut CommandEncoder) {
-        let mut render_pass = encoder.begin_render_pass(&RenderPassDescriptor {
-            color_attachments: &[RenderPassColorAttachmentDescriptor {
-                attachment: &frame.view,
-                resolve_target: None,
-                load_op: LoadOp::Clear,
-                store_op: StoreOp::Store,
-                clear_color: Color {
-                    r: 0.1,
-                    g: 0.2,
-                    b: 0.3,
-                    a: 1.0,
-                },
-            }],
-            depth_stencil_attachment: None,
-        });
         render_pass.set_pipeline(&self.render_pipeline);
-        render_pass.set_bind_group(0, &self.uniform_bind_group, &[]);
-
-        let query = <()>::query();
-
-        render_pass.draw_model();
+        let query = <(Read<Transform>, Tagged<ModelHandle>)>::query();
+        for chunk in query.iter_chunks(world) {
+            // This is guarenteed to be the same for each chunk
+            let model = chunk.tag::<ModelHandle>().unwrap();
+            let transforms = chunk.components::<Transform>().unwrap();
+            let model = asset_manager.asset_map.get(model).unwrap();
+            render_pass.draw_model_instanced(
+                model,
+                0..transforms.len() as u32, //TODO: must use the same offset map probably?
+                &main_bind_group.bind_group,
+            )
+        }
     }
 }
