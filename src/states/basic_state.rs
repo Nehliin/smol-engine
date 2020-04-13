@@ -12,6 +12,7 @@ use std::collections::HashMap;
 
 use super::State;
 use crate::graphics::model::Model;
+use crate::graphics::PointLight;
 
 pub struct BasicState {
     schedule: Option<Schedule>,
@@ -125,6 +126,27 @@ impl State for BasicState {
                 floor_transform,
             )],
         );*/
+        let light_positions = vec![
+            Vector3::new(0.7, 0.2, 2.0),
+            Vector3::new(2.3, -3.3, -4.0),
+            Vector3::new(-4.0, 2.0, -12.0),
+            Vector3::new(0.0, 0.0, -3.0),
+        ];
+        world.insert(
+            (cube_handle, ()),
+            light_positions.iter().map(|&position| {
+                (
+                    Transform::new(
+                        Isometry3::translation(position.x, position.y, position.z),
+                        Vector3::new(0.5, 0.5, 0.5),
+                    ),
+                    PointLight {
+                        diffuse: Vector3::new(1.0, 0.5, 0.3),
+                        ..PointLight::default()
+                    },
+                )
+            }),
+        );
 
         world.insert(
             (suit_handle, ()), // selected

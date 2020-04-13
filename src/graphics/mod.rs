@@ -7,7 +7,10 @@ pub mod texture;
 pub use pass::Pass;
 pub mod wgpu_renderer;
 pub use wgpu_renderer::WgpuRenderer;
-
+pub mod uniform_bind_groups;
+pub use uniform_bind_groups::{UniformBindGroup, UniformCameraData};
+pub mod point_light;
+pub use point_light::PointLight;
 //pub mod basic_renderer;
 //pub use basic_renderer::BasicRenderer;
 use glfw::{Glfw, Window};

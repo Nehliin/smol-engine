@@ -16,7 +16,8 @@ use crate::camera::Camera;
 use crate::components::{AssetManager, ModelHandle};
 use crate::graphics::model::Model;
 use crate::graphics::pass::model_pass::ModelPass;
-use crate::graphics::{Pass, Renderer};
+use crate::graphics::uniform_bind_groups::CameraDataRaw;
+use crate::graphics::{Pass, Renderer, UniformBindGroup, UniformCameraData};
 use std::ops::Deref;
 
 //type RenderPass = Box<dyn Pass>;
@@ -43,79 +44,6 @@ fn create_depth_texture(
     device.create_texture(&desc)
 }
 
-#[repr(C)]
-#[derive(Clone, Copy)]
-pub struct UniformCameraData {
-    pub view_matrix: Matrix4<f32>,
-    pub projection: Matrix4<f32>,
-}
-
-pub struct UniformBindGroup {
-    pub buffer: Buffer,
-    pub bind_group: BindGroup,
-    pub bind_group_layout: BindGroupLayout,
-}
-
-impl UniformBindGroup {
-    pub fn new(device: &mut Device) -> Self {
-        let buffer = device.create_buffer(&BufferDescriptor {
-            label: Some("Uniform buffer"),
-            size: std::mem::size_of::<UniformCameraData>() as u64,
-            usage: BufferUsage::UNIFORM | BufferUsage::COPY_DST,
-        });
-        let bind_group_layout = device.create_bind_group_layout(&BindGroupLayoutDescriptor {
-            bindings: &[
-                // This is the layout of the uniform buffer
-                BindGroupLayoutEntry {
-                    binding: 0,
-                    visibility: ShaderStage::VERTEX,
-                    ty: BindingType::UniformBuffer { dynamic: false },
-                },
-            ],
-            label: Some("Uniform Bind group layout"),
-        });
-        let bind_group = device.create_bind_group(&BindGroupDescriptor {
-            layout: &bind_group_layout,
-            bindings: &[Binding {
-                binding: 0,
-                resource: BindingResource::Buffer {
-                    buffer: &buffer,
-                    range: 0..std::mem::size_of::<UniformCameraData>() as BufferAddress,
-                },
-            }],
-            label: Some("Uniform bind group"),
-        });
-        Self {
-            bind_group,
-            buffer,
-            bind_group_layout,
-        }
-    }
-
-    pub fn update(&self, device: &mut Device, data: UniformCameraData) -> CommandBuffer {
-        let data = unsafe {
-            std::slice::from_raw_parts(
-                &data as *const UniformCameraData as *const u8,
-                std::mem::size_of::<UniformCameraData>(),
-            )
-        };
-        let staging_buffer = device.create_buffer_with_data(data, BufferUsage::COPY_SRC);
-
-        let mut encoder = device.create_command_encoder(&CommandEncoderDescriptor {
-            label: Some("UniformCameraData staging buffer"),
-        });
-
-        encoder.copy_buffer_to_buffer(
-            &staging_buffer,
-            0,
-            &self.buffer,
-            0,
-            std::mem::size_of::<UniformCameraData>() as BufferAddress,
-        );
-        encoder.finish()
-    }
-}
-
 pub struct WgpuRenderer {
     surface: Surface,
     adapter: Adapter,
@@ -125,7 +53,7 @@ pub struct WgpuRenderer {
     swap_chain: SwapChain,
     width: u32,
     height: u32,
-    uniform_bind_group: UniformBindGroup,
+    camera_uniforms: UniformBindGroup<CameraDataRaw>,
     depth_texture: Texture,
     depth_texture_view: TextureView,
     model_pass: ModelPass,
@@ -167,7 +95,7 @@ impl WgpuRenderer {
 
         let swap_chain = device.create_swap_chain(&surface, &swap_chain_desc);
 
-        let uniform_bind_group = UniformBindGroup::new(&mut device);
+        let camera_uniforms = UniformBindGroup::new(&mut device, ShaderStage::VERTEX);
 
         let depth_texture = create_depth_texture(&device, &swap_chain_desc);
         let depth_texture_view = depth_texture.create_default_view();
@@ -211,9 +139,10 @@ impl WgpuRenderer {
         let model_pass = ModelPass::new(
             &mut device,
             &layout,
-            &uniform_bind_group.bind_group_layout,
+            &camera_uniforms.bind_group_layout,
             swap_chain_desc.format,
         );
+        // TODO: this must be moved
         let (model, cmd_buffer) =
             Model::load("nanosuit/nanosuit.obj", &mut device, &layout).unwrap();
         let (cube_model, cmd_buffer_1) = Model::load("box/cube.obj", &mut device, &layout).unwrap();
@@ -238,7 +167,7 @@ impl WgpuRenderer {
             depth_texture,
             depth_texture_view,
             model_pass,
-            uniform_bind_group,
+            camera_uniforms,
         }
     }
 
@@ -257,24 +186,34 @@ impl WgpuRenderer {
             .create_swap_chain(&self.surface, &self.swap_chain_desc);
     }
 
-    pub fn render_frame(&mut self, world: &mut World, resources: &mut Resources) {
-        let frame = self.swap_chain.get_next_texture().unwrap();
-        let mut command_buffers = Vec::new();
-        let camera = resources.get::<Camera>().unwrap();
-        let commands = self.uniform_bind_group.update(
+    fn update_camera_uniforms(&mut self, camera: &Camera) -> CommandBuffer {
+        self.camera_uniforms.update(
             &mut self.device,
             UniformCameraData {
                 view_matrix: *camera.get_view_matrix(),
                 projection: *camera.get_projection_matrix(),
-            },
-        );
+                view_pos: camera.get_vec_position(),
+            }
+            .into(),
+        )
+    }
+
+    pub fn render_frame(&mut self, world: &mut World, resources: &mut Resources) {
+        let frame = self.swap_chain.get_next_texture().unwrap();
+        let mut command_buffers = Vec::new();
+        let camera = resources.get::<Camera>().unwrap();
+        let commands = self.update_camera_uniforms(&camera);
         command_buffers.push(commands);
+        let commands = self.model_pass.update_lights(world, &mut self.device);
+        command_buffers.extend(commands.into_iter());
         let mut encoder = self
             .device
             .create_command_encoder(&CommandEncoderDescriptor {
                 label: Some("Model render pass"),
             });
+
         let asset_manager = resources.get::<AssetManager>().unwrap();
+
         ModelPass::update_instances(resources, world, &mut encoder, &mut self.device);
         {
             let mut render_pass = encoder.begin_render_pass(&RenderPassDescriptor {
@@ -302,7 +241,7 @@ impl WgpuRenderer {
             });
 
             self.model_pass.render(
-                &mut self.uniform_bind_group,
+                &self.camera_uniforms,
                 &asset_manager,
                 world,
                 &mut render_pass,

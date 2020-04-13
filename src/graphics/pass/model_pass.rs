@@ -19,7 +19,11 @@ use wgpu::{
 use crate::components::{AssetManager, ModelHandle, Transform};
 use crate::graphics::model::MeshVertex;
 use crate::graphics::model::{DrawModel, InstanceData};
-use crate::graphics::wgpu_renderer::{UniformBindGroup, DEPTH_FORMAT};
+use crate::graphics::point_light::PointLightRaw;
+//use crate::graphics::uniform_bind_groups::LightUniforms;
+use crate::graphics::uniform_bind_groups::{CameraDataRaw, LightUniforms};
+use crate::graphics::wgpu_renderer::DEPTH_FORMAT;
+use crate::graphics::{PointLight, UniformBindGroup, UniformCameraData};
 
 pub trait VBDesc {
     fn desc<'a>() -> VertexBufferDescriptor<'a>;
@@ -37,86 +41,9 @@ fn load_shader() -> (Vec<u32>, Vec<u32>) {
     (vs_data, fs_data)
 }
 
-/*#[repr(C)]
-#[derive(Copy, Clone)]
-struct InstanceData {
-    pub model: Matrix4<f32>,
-}
-
-struct InstanceBindGroup {
-    buffer: Buffer,
-    bind_group: BindGroup,
-    bind_group_layout: BindGroupLayout,
-}
-
-const MAX_INSTANCE_LENGTH: usize = 100;
-
-impl InstanceBindGroup {
-    pub fn new(device: &mut Device) -> Self {
-        let buffer = device.create_buffer(&BufferDescriptor {
-            label: Some("Instance Buffer"),
-            size: (MAX_INSTANCE_LENGTH * std::mem::size_of::<InstanceData>()) as u64,
-            usage: BufferUsage::STORAGE_READ | BufferUsage::COPY_DST,
-        });
-        let bind_group_layout = device.create_bind_group_layout(&BindGroupLayoutDescriptor {
-            bindings: &[
-                // This is the layout of the uniform buffer
-                BindGroupLayoutEntry {
-                    binding: 0,
-                    visibility: ShaderStage::VERTEX,
-                    ty: BindingType::StorageBuffer {
-                        dynamic: false,
-                        readonly: true,
-                    },
-                },
-            ],
-            label: Some("Instance Bind group layout"),
-        });
-        let bind_group = device.create_bind_group(&BindGroupDescriptor {
-            layout: &bind_group_layout,
-            bindings: &[Binding {
-                binding: 0,
-                resource: BindingResource::Buffer {
-                    buffer: &buffer,
-                    range: 0..(std::mem::size_of::<InstanceData>() * MAX_INSTANCE_LENGTH)
-                        as BufferAddress,
-                },
-            }],
-            label: Some("Uniform bind group"),
-        });
-        Self {
-            bind_group,
-            buffer,
-            bind_group_layout,
-        }
-    }
-    // Store staging buffer within the pass instead? use mem replace in that case
-    pub fn update(&self, device: &mut Device, transform_data: &[Transform]) -> CommandBuffer {
-        let instance_data = transform_data
-            .iter()
-            .map(|trans| InstanceData {
-                model: trans.get_model_matrix(),
-            })
-            .collect::<Vec<InstanceData>>();
-        let staging_buffer =
-            device.create_buffer_with_data(instance_data.as_bytes(), BufferUsage::COPY_SRC);
-        let mut encoder = device.create_command_encoder(&CommandEncoderDescriptor {
-            label: Some("UniformCameraData staging buffer"),
-        });
-
-        encoder.copy_buffer_to_buffer(
-            &staging_buffer,
-            0,
-            &self.buffer,
-            0,
-            std::mem::size_of_val(&instance_data) as BufferAddress,
-        );
-        encoder.finish()
-    }
-}*/
-
 pub struct ModelPass {
     render_pipeline: RenderPipeline,
+    light_uniforms: UniformBindGroup<LightUniforms>,
 }
 
 impl ModelPass {
@@ -130,8 +57,14 @@ impl ModelPass {
         let vertex_shader = device.create_shader_module(&vs_data);
         let fragment_shader = device.create_shader_module(&fs_data);
 
+        let light_uniforms = UniformBindGroup::new(device, ShaderStage::FRAGMENT);
+
         let render_pipeline_layout = device.create_pipeline_layout(&PipelineLayoutDescriptor {
-            bind_group_layouts: &[&texture_layout, main_bind_group_layout],
+            bind_group_layouts: &[
+                &texture_layout,
+                main_bind_group_layout,
+                &light_uniforms.bind_group_layout,
+            ],
         });
 
         let render_pipeline = device.create_render_pipeline(&RenderPipelineDescriptor {
@@ -146,7 +79,7 @@ impl ModelPass {
             }),
             rasterization_state: Some(RasterizationStateDescriptor {
                 front_face: FrontFace::Ccw,
-                cull_mode: CullMode::Back, // TODO: change this
+                cull_mode: CullMode::Back,
                 depth_bias: 0,
                 depth_bias_slope_scale: 0.0,
                 depth_bias_clamp: 0.0,
@@ -176,7 +109,40 @@ impl ModelPass {
             alpha_to_coverage_enabled: false,
         });
 
-        Self { render_pipeline }
+        Self {
+            render_pipeline,
+            light_uniforms,
+        }
+    }
+    // fett hacky
+    pub fn update_lights(&mut self, world: &mut World, device: &mut Device) -> Vec<CommandBuffer> {
+        let query = <(Write<PointLight>, Read<Transform>)>::query();
+        let mut command_buffers = Vec::new();
+        for chunk in query.iter_chunks_mut(world) {
+            let mut lights = chunk.components_mut::<PointLight>().unwrap();
+            let positions = chunk.components::<Transform>().unwrap();
+            let mut uniform_data = [PointLightRaw::from(PointLight::default()); 16];
+            let mut lights_used = 0;
+            lights
+                .iter_mut()
+                .zip(positions.iter())
+                .enumerate()
+                .for_each(|(i, (light, pos))| {
+                    light.position = pos.translation(); // Should not be part of pointlight
+                    uniform_data[i] = PointLightRaw::from(*light);
+                    lights_used += 1;
+                });
+
+            command_buffers.push(self.light_uniforms.update(
+                device,
+                LightUniforms {
+                    lights_used,
+                    pad: [0; 3],
+                    point_lights: uniform_data,
+                },
+            ));
+        }
+        command_buffers
     }
 
     pub fn update_instances(
@@ -216,7 +182,7 @@ impl ModelPass {
 
     pub fn render<'pass, 'encoder: 'pass>(
         &'encoder self,
-        main_bind_group: &'encoder UniformBindGroup,
+        main_bind_group: &'encoder UniformBindGroup<CameraDataRaw>,
         asset_manager: &'encoder AssetManager,
         world: &'encoder mut World,
         render_pass: &'pass mut RenderPass<'encoder>,
@@ -228,6 +194,7 @@ impl ModelPass {
             let model = chunk.tag::<ModelHandle>().unwrap();
             let transforms = chunk.components::<Transform>().unwrap();
             let model = asset_manager.asset_map.get(model).unwrap();
+            render_pass.set_bind_group(2, &self.light_uniforms.bind_group, &[]);
             render_pass.draw_model_instanced(
                 model,
                 0..transforms.len() as u32, //TODO: must use the same offset map probably?

@@ -15,7 +15,6 @@ pub struct PhysicsBody {
 pub struct Cube;
 
 #[repr(C)]
-#[derive()]
 pub struct Transform {
     pub isometry: Isometry3<f32>,
     pub scale: Vector3<f32>,

@@ -197,10 +197,9 @@ impl Model {
         }
         let instance_buffer = device.create_buffer(&BufferDescriptor {
             label: Some("Instance buffer"),
-            size: 1200,
+            size: 1000, //TODO:  reallocate this if it's changed and minimize data
             usage: BufferUsage::VERTEX | BufferUsage::COPY_DST,
         });
-        //prova skriva till buffern här
         Ok((
             Model {
                 meshes,
