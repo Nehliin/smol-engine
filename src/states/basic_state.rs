@@ -1,6 +1,6 @@
 use crate::camera::Camera;
 //use crate::components::Selected;
-use crate::components::{AssetManager, Cube, LightTag, ModelHandle, Transform};
+use crate::components::{Cube, LightTag, ModelHandle, Transform};
 use crate::engine::{InputEvent, Time, WINDOW_HEIGHT, WINDOW_WIDTH};
 use crate::physics::Physics;
 use glfw::{Action, Key};

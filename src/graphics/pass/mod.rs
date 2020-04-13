@@ -1,6 +1,6 @@
 use legion::prelude::{Resources, World};
 use wgpu::{CommandBuffer, CommandEncoder, CreateBufferMapped};
-use wgpu::{Device, SwapChainOutput, Texture};
+use wgpu::{Device, SwapChainOutput};
 
 pub mod model_pass;
 

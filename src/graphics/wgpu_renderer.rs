@@ -1,11 +1,10 @@
-use glfw::{Glfw, Window};
+use glfw::Window;
 use legion::prelude::{Resources, World};
-use nalgebra::Matrix4;
 use wgpu::{
-    Adapter, BackendBit, BindGroup, BindGroupDescriptor, BindGroupLayout,
-    BindGroupLayoutDescriptor, BindGroupLayoutEntry, Binding, BindingResource, BindingType, Buffer,
-    BufferAddress, BufferDescriptor, BufferUsage, Color, CommandBuffer, CommandEncoderDescriptor,
-    Device, DeviceDescriptor, Extensions, Extent3d, LoadOp, PowerPreference, PresentMode, Queue,
+    Adapter, BackendBit, BindGroupLayout, BindGroupLayoutDescriptor,
+    BindGroupLayoutEntry, Binding, BindingResource, BindingType, Buffer, BufferAddress,
+    BufferDescriptor, BufferUsage, Color, CommandBuffer, CommandEncoderDescriptor, Device,
+    DeviceDescriptor, Extensions, Extent3d, LoadOp, PowerPreference, PresentMode, Queue,
     RenderPassColorAttachmentDescriptor, RenderPassDepthStencilAttachmentDescriptor,
     RenderPassDescriptor, RequestAdapterOptions, ShaderStage, StoreOp, Surface, SwapChain,
     SwapChainDescriptor, Texture, TextureComponentType, TextureDimension, TextureFormat,
@@ -17,8 +16,7 @@ use crate::components::{AssetManager, ModelHandle};
 use crate::graphics::model::Model;
 use crate::graphics::pass::model_pass::ModelPass;
 use crate::graphics::uniform_bind_groups::CameraDataRaw;
-use crate::graphics::{Pass, Renderer, UniformBindGroup, UniformCameraData};
-use std::ops::Deref;
+use crate::graphics::{ UniformBindGroup, UniformCameraData};
 
 //type RenderPass = Box<dyn Pass>;
 

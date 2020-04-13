@@ -1,13 +1,13 @@
 use std::collections::HashMap;
 
 use legion::prelude::*;
-use nalgebra::{Matrix4, Vector3};
+use nalgebra::Vector3;
 use wgpu::{
-    BindGroupDescriptor, BindGroupLayout, BindGroupLayoutDescriptor, BindGroupLayoutEntry, Binding,
-    BindingResource, BindingType, BlendDescriptor, Buffer, BufferAddress, BufferDescriptor,
-    BufferUsage, Color, ColorStateDescriptor, ColorWrite, CommandBuffer, CommandEncoder,
-    CommandEncoderDescriptor, CreateBufferMapped, CullMode, DepthStencilStateDescriptor, Device,
-    FrontFace, IndexFormat, InputStepMode, LoadOp, PipelineLayoutDescriptor, PrimitiveTopology,
+    BindGroupLayout, BindGroupLayoutDescriptor, BindGroupLayoutEntry, Binding, BindingResource,
+    BindingType, BlendDescriptor, Buffer, BufferAddress, BufferDescriptor, BufferUsage, Color,
+    ColorStateDescriptor, ColorWrite, CommandBuffer, CommandEncoder, CommandEncoderDescriptor,
+    CreateBufferMapped, CullMode, DepthStencilStateDescriptor, Device, FrontFace, IndexFormat,
+    InputStepMode, LoadOp, PipelineLayoutDescriptor, PrimitiveTopology,
     ProgrammableStageDescriptor, Queue, RasterizationStateDescriptor, RenderPass,
     RenderPassColorAttachmentDescriptor, RenderPassDepthStencilAttachmentDescriptor,
     RenderPassDescriptor, RenderPipeline, RenderPipelineDescriptor, ShaderStage, StoreOp,
@@ -23,7 +23,7 @@ use crate::graphics::point_light::PointLightRaw;
 //use crate::graphics::uniform_bind_groups::LightUniforms;
 use crate::graphics::uniform_bind_groups::{CameraDataRaw, LightUniforms};
 use crate::graphics::wgpu_renderer::DEPTH_FORMAT;
-use crate::graphics::{PointLight, UniformBindGroup, UniformCameraData};
+use crate::graphics::{PointLight, UniformBindGroup};
 
 pub trait VBDesc {
     fn desc<'a>() -> VertexBufferDescriptor<'a>;

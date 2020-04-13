@@ -1,12 +1,10 @@
 use anyhow::Result;
-use image::DynamicImage::{ImageLuma8, ImageLumaA8, ImageRgb8, ImageRgba8};
 use image::{DynamicImage, GenericImage};
 use std::path::Path;
 use wgpu::{
-    AddressMode, BufferCopyView, BufferDescriptor, BufferUsage, CommandBuffer,
-    CommandEncoderDescriptor, CompareFunction, Device, Extent3d, FilterMode, Origin3d, Sampler,
-    SamplerDescriptor, TextureCopyView, TextureDescriptor, TextureDimension, TextureFormat,
-    TextureUsage, TextureView,
+    AddressMode, BufferCopyView, BufferUsage, CommandBuffer, CommandEncoderDescriptor,
+    CompareFunction, Device, Extent3d, FilterMode, Origin3d, Sampler, SamplerDescriptor,
+    TextureCopyView, TextureDescriptor, TextureDimension, TextureFormat, TextureUsage, TextureView,
 };
 
 pub struct Texture {
@@ -16,12 +14,6 @@ pub struct Texture {
 }
 
 impl Texture {
-    pub fn from_bytes(device: &Device, bytes: &[u8]) -> Result<(Self, CommandBuffer)> {
-        let img = image::load_from_memory(bytes)?;
-        //P  let img = img.flipv();
-        Texture::from_image(device, &img)
-    }
-
     pub fn load(device: &Device, path: impl AsRef<Path>) -> Result<(Self, CommandBuffer)> {
         let img = image::open(path)?;
         let img = img.flipv();

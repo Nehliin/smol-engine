@@ -1,13 +1,12 @@
 use crate::graphics::point_light::PointLightRaw;
-use crate::graphics::PointLight;
-use nalgebra::{Matrix, Matrix4, Vector3};
+use nalgebra::{Matrix4, Vector3};
 use wgpu::{
     BindGroup, BindGroupDescriptor, BindGroupLayout, BindGroupLayoutDescriptor,
     BindGroupLayoutEntry, Binding, BindingResource, BindingType, Buffer, BufferAddress,
     BufferDescriptor, BufferUsage, CommandBuffer, CommandEncoderDescriptor, Device, ShaderStage,
 };
+use zerocopy::AsBytes;
 use zerocopy::FromBytes;
-use zerocopy::{AsBytes, ByteSlice};
 
 #[repr(C)]
 #[derive(Clone, Copy)]
@@ -77,7 +76,6 @@ pub struct UniformBindGroup<T: Default> {
 
 impl<T: Default + AsBytes> UniformBindGroup<T> {
     pub fn new(device: &mut Device, visibility: ShaderStage) -> Self {
-        println!("size create: {}", std::mem::size_of::<T>());
         let buffer = device.create_buffer(&BufferDescriptor {
             label: Some("Uniform buffer"),
             size: std::mem::size_of::<T>() as u64,
