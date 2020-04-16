@@ -1,14 +1,14 @@
-use crate::graphics::pass::model_pass::VBDesc;
+use crate::graphics::pass::VBDesc;
 use crate::graphics::texture::Texture;
 use anyhow::Result;
-use nalgebra::{Matrix4, Vector2, Vector3};
+use nalgebra::{Matrix4, Vector3};
 use std::ops::Range;
 use std::path::Path;
 use wgpu::{
-    BindGroup, BindGroupDescriptor, BindGroupLayout, BindGroupLayoutDescriptor,
-    BindGroupLayoutEntry, Binding, BindingResource, BindingType, Buffer, BufferAddress,
-    BufferDescriptor, BufferUsage, CommandBuffer, Device, InputStepMode, ShaderStage,
-    TextureViewDimension, VertexAttributeDescriptor, VertexBufferDescriptor, VertexFormat,
+    BindGroup, BindGroupDescriptor, BindGroupLayout, BindGroupLayoutEntry, Binding,
+    BindingResource, BindingType, Buffer, BufferAddress, BufferDescriptor, BufferUsage,
+    CommandBuffer, Device, InputStepMode, ShaderStage, TextureViewDimension,
+    VertexAttributeDescriptor, VertexBufferDescriptor, VertexFormat,
 };
 use zerocopy::AsBytes;
 
@@ -197,7 +197,7 @@ impl Model {
         }
         let instance_buffer = device.create_buffer(&BufferDescriptor {
             label: Some("Instance buffer"),
-            size: 1000, //TODO:  reallocate this if it's changed and minimize data
+            size: 16_000 * 400, //TODO:  reallocate this if it's changed and minimize data
             usage: BufferUsage::VERTEX | BufferUsage::COPY_DST,
         });
         Ok((

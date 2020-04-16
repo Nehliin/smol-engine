@@ -20,7 +20,7 @@ panic = "abort"
 [dependencies]
 jemallocator = "0.3"
 nalgebra = "0.20"
-nalgebra-glm = "0.7.0"
+thiserror = "1.0"
 ncollide3d = "0.22"
 nphysics3d = "0.14"
 wgpu = "0.5"

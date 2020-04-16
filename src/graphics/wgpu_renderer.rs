@@ -1,22 +1,22 @@
 use glfw::Window;
 use legion::prelude::{Resources, World};
 use wgpu::{
-    Adapter, BackendBit, BindGroupLayout, BindGroupLayoutDescriptor,
-    BindGroupLayoutEntry, Binding, BindingResource, BindingType, Buffer, BufferAddress,
-    BufferDescriptor, BufferUsage, Color, CommandBuffer, CommandEncoderDescriptor, Device,
-    DeviceDescriptor, Extensions, Extent3d, LoadOp, PowerPreference, PresentMode, Queue,
-    RenderPassColorAttachmentDescriptor, RenderPassDepthStencilAttachmentDescriptor,
-    RenderPassDescriptor, RequestAdapterOptions, ShaderStage, StoreOp, Surface, SwapChain,
-    SwapChainDescriptor, Texture, TextureComponentType, TextureDimension, TextureFormat,
-    TextureUsage, TextureView, TextureViewDimension,
+    Adapter, BackendBit, BindGroupLayout, BindGroupLayoutDescriptor, BindGroupLayoutEntry, Binding,
+    BindingResource, BindingType, Buffer, BufferAddress, BufferDescriptor, BufferUsage, Color,
+    CommandBuffer, CommandEncoderDescriptor, Device, DeviceDescriptor, Extensions, Extent3d,
+    LoadOp, PowerPreference, PresentMode, Queue, RenderPassColorAttachmentDescriptor,
+    RenderPassDepthStencilAttachmentDescriptor, RenderPassDescriptor, RequestAdapterOptions,
+    ShaderStage, StoreOp, Surface, SwapChain, SwapChainDescriptor, Texture, TextureComponentType,
+    TextureDimension, TextureFormat, TextureUsage, TextureView, TextureViewDimension,
 };
 
 use crate::camera::Camera;
 use crate::components::{AssetManager, ModelHandle};
 use crate::graphics::model::Model;
+use crate::graphics::pass::light_object_pass::LightObjectPass;
 use crate::graphics::pass::model_pass::ModelPass;
 use crate::graphics::uniform_bind_groups::CameraDataRaw;
-use crate::graphics::{ UniformBindGroup, UniformCameraData};
+use crate::graphics::{UniformBindGroup, UniformCameraData};
 
 //type RenderPass = Box<dyn Pass>;
 
@@ -55,6 +55,7 @@ pub struct WgpuRenderer {
     depth_texture: Texture,
     depth_texture_view: TextureView,
     model_pass: ModelPass,
+    light_pass: LightObjectPass,
     // Storing all the render passes
     // render_passes: Vec<RenderPass>,
 }
@@ -135,21 +136,32 @@ impl WgpuRenderer {
         });
 
         let model_pass = ModelPass::new(
-            &mut device,
+            &device,
+            vec![&layout, &camera_uniforms.bind_group_layout],
+            swap_chain_desc.format,
+        )
+        .unwrap();
+        let light_pass = LightObjectPass::new(
+            &device,
             &layout,
             &camera_uniforms.bind_group_layout,
             swap_chain_desc.format,
         );
+
         // TODO: this must be moved
-        let (model, cmd_buffer) =
-            Model::load("nanosuit/nanosuit.obj", &mut device, &layout).unwrap();
-        let (cube_model, cmd_buffer_1) = Model::load("box/cube.obj", &mut device, &layout).unwrap();
+        let (sphere_model, cmd_buffer_0) =
+            Model::load("light/untitled.obj", &device, &layout).unwrap();
+        let (model, cmd_buffer) = Model::load("nanosuit/nanosuit.obj", &device, &layout).unwrap();
+        let (cube_model, cmd_buffer_1) = Model::load("box/cube.obj", &device, &layout).unwrap();
         queue.submit(&cmd_buffer);
         queue.submit(&cmd_buffer_1);
+        queue.submit(&cmd_buffer_0);
         let handle = ModelHandle { id: 0 };
         let handle_2 = ModelHandle { id: 1 };
+        let handle_3 = ModelHandle { id: 2 };
         let mut asset_manager = AssetManager::new();
         asset_manager.asset_map.insert(handle, model);
+        asset_manager.asset_map.insert(handle_3, sphere_model);
         asset_manager.asset_map.insert(handle_2, cube_model);
         resources.insert(asset_manager);
 
@@ -165,6 +177,7 @@ impl WgpuRenderer {
             depth_texture,
             depth_texture_view,
             model_pass,
+            light_pass,
             camera_uniforms,
         }
     }
@@ -245,7 +258,39 @@ impl WgpuRenderer {
                 &mut render_pass,
             );
         }
+        {
+            let mut render_pass = encoder.begin_render_pass(&RenderPassDescriptor {
+                color_attachments: &[RenderPassColorAttachmentDescriptor {
+                    attachment: &frame.view,
+                    resolve_target: None,
+                    load_op: LoadOp::Load,
+                    store_op: StoreOp::Store,
+                    clear_color: Color {
+                        r: 0.1,
+                        g: 0.2,
+                        b: 0.3,
+                        a: 1.0,
+                    },
+                }],
+                depth_stencil_attachment: Some(RenderPassDepthStencilAttachmentDescriptor {
+                    attachment: &self.depth_texture_view,
+                    depth_load_op: LoadOp::Load,
+                    depth_store_op: StoreOp::Store,
+                    clear_depth: 1.0,
+                    stencil_load_op: LoadOp::Load,
+                    stencil_store_op: StoreOp::Store,
+                    clear_stencil: 0,
+                }),
+            });
+            self.light_pass.render(
+                &self.camera_uniforms,
+                &asset_manager,
+                world,
+                &mut render_pass,
+            );
+        }
         command_buffers.push(encoder.finish());
+
         self.queue.submit(&command_buffers);
     }
 }

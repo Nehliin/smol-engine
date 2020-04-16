@@ -39,6 +39,7 @@ impl State for BasicState {
     fn start(&mut self, world: &mut World, resources: &mut Resources) {
         let suit_handle = ModelHandle { id: 0 };
         let cube_handle = ModelHandle { id: 1 };
+        let sphere_handle = ModelHandle { id: 2 };
         /*let physicis = Physics::new(resources);
         let schedule = Schedule::builder().add_system(physicis.system).build();
 
@@ -133,7 +134,7 @@ impl State for BasicState {
             Vector3::new(0.0, 0.0, -3.0),
         ];
         world.insert(
-            (cube_handle, ()),
+            (sphere_handle, ()),
             light_positions.iter().map(|&position| {
                 (
                     Transform::new(
@@ -147,13 +148,20 @@ impl State for BasicState {
                 )
             }),
         );
+        let mut components = Vec::new();
+
+        for x in 0..100 {
+            for y in 0..100 {
+                components.push((Transform::new(
+                    Isometry3::translation(x as f32, -1.75, y as f32),
+                    Vector3::new(0.2, 0.2, 0.2),
+                ),));
+            }
+        }
 
         world.insert(
             (suit_handle, ()), // selected
-            vec![(Transform::new(
-                Isometry3::translation(0.0, -1.75, 0.0),
-                Vector3::new(0.2, 0.2, 0.2),
-            ),)],
+            components,
         );
         let floor_transform = Transform::new(
             Isometry3::new(

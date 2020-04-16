@@ -75,7 +75,7 @@ pub struct UniformBindGroup<T: Default> {
 }
 
 impl<T: Default + AsBytes> UniformBindGroup<T> {
-    pub fn new(device: &mut Device, visibility: ShaderStage) -> Self {
+    pub fn new(device: &Device, visibility: ShaderStage) -> Self {
         let buffer = device.create_buffer(&BufferDescriptor {
             label: Some("Uniform buffer"),
             size: std::mem::size_of::<T>() as u64,

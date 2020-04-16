@@ -4,6 +4,7 @@ use crate::states::State;
 use glfw::{Action, Context, Glfw, Key, MouseButton, Window, WindowEvent};
 use legion::prelude::*;
 use nalgebra::{Point3, Vector3};
+use std::io::Write;
 use std::sync::mpsc::Receiver;
 
 //TODO: move this
@@ -92,9 +93,12 @@ impl Engine {
         let mut last_frame = 0.0;
         self.current_state
             .start(&mut self.world, &mut self.resources);
+        let stdout = std::io::stdout();
+        let mut handle = stdout.lock();
         while !self.window.should_close() {
             let current_frame = self.glfw.get_time() as f32;
             let delta_time = current_frame - last_frame;
+            handle.write_fmt(format_args!("fps: {}\n", 1.0 / delta_time));
             last_frame = current_frame;
             {
                 let mut time = self.resources.get_mut::<Time>().unwrap();

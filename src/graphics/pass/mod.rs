@@ -1,8 +1,13 @@
 use legion::prelude::{Resources, World};
-use wgpu::{CommandBuffer, CommandEncoder, CreateBufferMapped};
+use wgpu::{CommandBuffer, CommandEncoder, VertexBufferDescriptor};
 use wgpu::{Device, SwapChainOutput};
 
+pub mod light_object_pass;
 pub mod model_pass;
+
+pub trait VBDesc {
+    fn desc<'a>() -> VertexBufferDescriptor<'a>;
+}
 
 pub trait Pass {
     //fn new(device: &mut Device) -> Box<Self>;

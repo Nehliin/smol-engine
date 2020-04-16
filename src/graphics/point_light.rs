@@ -1,7 +1,6 @@
 use nalgebra::Vector3;
 use zerocopy::AsBytes;
 
-
 #[repr(C)]
 #[derive(Copy, Clone, Debug)]
 pub struct PointLight {
@@ -18,34 +17,34 @@ pub struct PointLight {
 #[derive(Copy, Clone, Debug, Default, AsBytes)]
 pub struct PointLightRaw {
     position: [f32; 3],
-    pad: f32,
-    amibent: [f32; 3],
-    pad1: f32,
+    _pad: f32,
+    ambient: [f32; 3],
+    _pad1: f32,
     specular: [f32; 3],
-    pad2: f32,
+    _pad2: f32,
     diffuse: [f32; 3],
     constant: f32,
     linear: f32,
     quadratic: f32,
-    pad3: f32,
-    pad4: f32,
+    _pad3: f32,
+    _pad4: f32,
 }
 
 impl From<PointLight> for PointLightRaw {
     fn from(light: PointLight) -> Self {
         PointLightRaw {
             position: [light.position.x, light.position.y, light.position.z],
-            amibent: [light.ambient.x, light.ambient.y, light.ambient.z],
+            ambient: [light.ambient.x, light.ambient.y, light.ambient.z],
             specular: [light.specular.x, light.specular.y, light.specular.z],
             diffuse: [light.diffuse.x, light.diffuse.y, light.diffuse.z],
             constant: light.constant,
             linear: light.linear,
             quadratic: light.quadratic,
-            pad: 0.0,
-            pad1: 0.0,
-            pad2: 0.0,
-            pad3: 0.0,
-            pad4: 0.0,
+            _pad: 0.0,
+            _pad1: 0.0,
+            _pad2: 0.0,
+            _pad3: 0.0,
+            _pad4: 0.0,
         }
     }
 }
@@ -58,7 +57,7 @@ impl Default for PointLight {
 
         PointLight {
             position: Vector3::new(0.0, 0.0, 0.0),
-            ambient: Vector3::new(0.1, 0.1, 0.1),
+            ambient: Vector3::new(0.01, 0.01, 0.01),
             specular: Vector3::new(1.0, 1.0, 1.0),
             diffuse: Vector3::new(1.0, 1.0, 1.0),
             constant,

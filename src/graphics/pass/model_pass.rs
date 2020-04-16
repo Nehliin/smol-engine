@@ -1,45 +1,23 @@
-use std::collections::HashMap;
-
-use legion::prelude::*;
-use nalgebra::Vector3;
-use wgpu::{
-    BindGroupLayout, BindGroupLayoutDescriptor, BindGroupLayoutEntry, Binding, BindingResource,
-    BindingType, BlendDescriptor, Buffer, BufferAddress, BufferDescriptor, BufferUsage, Color,
-    ColorStateDescriptor, ColorWrite, CommandBuffer, CommandEncoder, CommandEncoderDescriptor,
-    CreateBufferMapped, CullMode, DepthStencilStateDescriptor, Device, FrontFace, IndexFormat,
-    InputStepMode, LoadOp, PipelineLayoutDescriptor, PrimitiveTopology,
-    ProgrammableStageDescriptor, Queue, RasterizationStateDescriptor, RenderPass,
-    RenderPassColorAttachmentDescriptor, RenderPassDepthStencilAttachmentDescriptor,
-    RenderPassDescriptor, RenderPipeline, RenderPipelineDescriptor, ShaderStage, StoreOp,
-    SwapChainDescriptor, SwapChainOutput, Texture, TextureComponentType, TextureFormat,
-    TextureView, TextureViewDimension, VertexAttributeDescriptor, VertexBufferDescriptor,
-    VertexFormat, VertexStateDescriptor,
+use crate::{
+    components::{AssetManager, ModelHandle, Transform},
+    graphics::model::MeshVertex,
+    graphics::model::{DrawModel, InstanceData},
+    graphics::pass::VBDesc,
+    graphics::point_light::PointLightRaw,
+    graphics::uniform_bind_groups::{CameraDataRaw, LightUniforms},
+    graphics::wgpu_renderer::DEPTH_FORMAT,
+    graphics::{PointLight, Shader, UniformBindGroup},
 };
-
-use crate::components::{AssetManager, ModelHandle, Transform};
-use crate::graphics::model::MeshVertex;
-use crate::graphics::model::{DrawModel, InstanceData};
-use crate::graphics::point_light::PointLightRaw;
-//use crate::graphics::uniform_bind_groups::LightUniforms;
-use crate::graphics::uniform_bind_groups::{CameraDataRaw, LightUniforms};
-use crate::graphics::wgpu_renderer::DEPTH_FORMAT;
-use crate::graphics::{PointLight, UniformBindGroup};
-
-pub trait VBDesc {
-    fn desc<'a>() -> VertexBufferDescriptor<'a>;
-}
-
-// make general over path later
-fn load_shader() -> (Vec<u32>, Vec<u32>) {
-    let vs_src = include_str!("../../shader_files/vertex.shader");
-    let fs_src = include_str!("../../shader_files/fragment.shader");
-
-    let vs_spirv = glsl_to_spirv::compile(vs_src, glsl_to_spirv::ShaderType::Vertex).unwrap();
-    let fs_spirv = glsl_to_spirv::compile(fs_src, glsl_to_spirv::ShaderType::Fragment).unwrap();
-    let vs_data = wgpu::read_spirv(vs_spirv).unwrap();
-    let fs_data = wgpu::read_spirv(fs_spirv).unwrap();
-    (vs_data, fs_data)
-}
+use anyhow::Result;
+use glsl_to_spirv::ShaderType;
+use legion::prelude::*;
+use std::collections::HashMap;
+use wgpu::{
+    BindGroupLayout, BlendDescriptor, BufferUsage, ColorStateDescriptor, ColorWrite, CommandBuffer,
+    CommandEncoder, CullMode, Device, FrontFace, IndexFormat, PipelineLayoutDescriptor,
+    PrimitiveTopology, RasterizationStateDescriptor, RenderPass, RenderPipeline,
+    RenderPipelineDescriptor, ShaderStage, TextureFormat, VertexStateDescriptor,
+};
 
 pub struct ModelPass {
     render_pipeline: RenderPipeline,
@@ -48,35 +26,35 @@ pub struct ModelPass {
 
 impl ModelPass {
     pub fn new(
-        device: &mut Device,
-        texture_layout: &BindGroupLayout,
-        main_bind_group_layout: &BindGroupLayout,
-        format: TextureFormat,
-    ) -> Self {
-        let (vs_data, fs_data) = load_shader();
-        let vertex_shader = device.create_shader_module(&vs_data);
-        let fragment_shader = device.create_shader_module(&fs_data);
+        device: &Device,
+        incoming_layouts: Vec<&BindGroupLayout>,
+        //texture_layout: &BindGroupLayout,
+        //main_bind_group_layout: &BindGroupLayout,
+        color_format: TextureFormat,
+    ) -> Result<Self> {
+        let vs_shader = Shader::new(
+            &device,
+            "src/shader_files/vs_model.shader",
+            ShaderType::Vertex,
+        )?;
+        let fs_shader = Shader::new(
+            &device,
+            "src/shader_files/fs_model.shader",
+            ShaderType::Fragment,
+        )?;
 
         let light_uniforms = UniformBindGroup::new(device, ShaderStage::FRAGMENT);
+        let mut bind_group_layouts = incoming_layouts;
+        bind_group_layouts.push(&light_uniforms.bind_group_layout);
 
         let render_pipeline_layout = device.create_pipeline_layout(&PipelineLayoutDescriptor {
-            bind_group_layouts: &[
-                &texture_layout,
-                main_bind_group_layout,
-                &light_uniforms.bind_group_layout,
-            ],
+            bind_group_layouts: &bind_group_layouts,
         });
 
         let render_pipeline = device.create_render_pipeline(&RenderPipelineDescriptor {
             layout: &render_pipeline_layout,
-            vertex_stage: ProgrammableStageDescriptor {
-                module: &vertex_shader,
-                entry_point: "main",
-            },
-            fragment_stage: Some(ProgrammableStageDescriptor {
-                module: &fragment_shader,
-                entry_point: "main",
-            }),
+            vertex_stage: vs_shader.get_descriptor(),
+            fragment_stage: Some(fs_shader.get_descriptor()),
             rasterization_state: Some(RasterizationStateDescriptor {
                 front_face: FrontFace::Ccw,
                 cull_mode: CullMode::Back,
@@ -86,7 +64,7 @@ impl ModelPass {
             }),
             primitive_topology: PrimitiveTopology::TriangleList,
             color_states: &[ColorStateDescriptor {
-                format,
+                format: color_format,
                 alpha_blend: BlendDescriptor::REPLACE,
                 color_blend: BlendDescriptor::REPLACE,
                 write_mask: ColorWrite::ALL,
@@ -109,10 +87,10 @@ impl ModelPass {
             alpha_to_coverage_enabled: false,
         });
 
-        Self {
+        Ok(Self {
             render_pipeline,
             light_uniforms,
-        }
+        })
     }
     // fett hacky
     pub fn update_lights(&mut self, world: &mut World, device: &mut Device) -> Vec<CommandBuffer> {
@@ -173,7 +151,7 @@ impl ModelPass {
                 &temp_buf,
                 0,
                 instance_buffer,
-                0,
+                offset,
                 transforms.len() as u64,
             );
             offsets.insert(model.clone(), offset + transforms.len() as u64);
@@ -188,18 +166,23 @@ impl ModelPass {
         render_pass: &'pass mut RenderPass<'encoder>,
     ) {
         render_pass.set_pipeline(&self.render_pipeline);
-        let query = <(Read<Transform>, Tagged<ModelHandle>)>::query();
+        let mut offset_map = HashMap::new();
+        let query =
+            <(Read<Transform>, Tagged<ModelHandle>)>::query().filter(!component::<PointLight>());
         for chunk in query.iter_chunks(world) {
             // This is guarenteed to be the same for each chunk
             let model = chunk.tag::<ModelHandle>().unwrap();
+            let offset = *offset_map.get(model).unwrap_or(&0);
             let transforms = chunk.components::<Transform>().unwrap();
+            offset_map.insert(model.clone(), offset + transforms.len());
             let model = asset_manager.asset_map.get(model).unwrap();
+            // println!("{}", transforms.len());
             render_pass.set_bind_group(2, &self.light_uniforms.bind_group, &[]);
             render_pass.draw_model_instanced(
                 model,
-                0..transforms.len() as u32, //TODO: must use the same offset map probably?
+                offset as u32..(offset + transforms.len()) as u32, //TODO: must use the same offset map probably?
                 &main_bind_group.bind_group,
-            )
+            );
         }
     }
 }
