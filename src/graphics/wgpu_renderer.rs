@@ -210,7 +210,7 @@ impl WgpuRenderer {
         )
     }
 
-    pub fn render_frame(&mut self, world: &mut World, resources: &mut Resources) {
+    pub fn render_frame(&mut self, world: &World, resources: &Resources) {
         let frame = self.swap_chain.get_next_texture().unwrap();
         let camera = resources.get::<Camera>().unwrap();
         let mut encoder = self

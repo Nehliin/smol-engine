@@ -5,12 +5,11 @@ use crate::{
     graphics::model::{DrawModel, InstanceData},
     graphics::pass::VBDesc,
     graphics::point_light::PointLightRaw,
-    graphics::uniform_bind_groups::{CameraDataRaw, LightUniforms},
+    graphics::uniform_bind_groups::LightUniforms,
     graphics::wgpu_renderer::DEPTH_FORMAT,
     graphics::{PointLight, Shader, UniformBindGroup},
 };
 use anyhow::Result;
-use futures::SinkExt;
 use glsl_to_spirv::ShaderType;
 use legion::prelude::*;
 use nalgebra::{Matrix4, Vector3};
@@ -21,7 +20,6 @@ use wgpu::{
     PrimitiveTopology, RasterizationStateDescriptor, RenderPass, RenderPipeline,
     RenderPipelineDescriptor, ShaderStage, TextureFormat, VertexStateDescriptor,
 };
-use zerocopy::AsBytes;
 
 pub struct ModelPass {
     render_pipeline: RenderPipeline,
@@ -173,7 +171,7 @@ impl Pass for ModelPass {
         let query =
             <(Read<Transform>, Tagged<ModelHandle>)>::query().filter(!component::<PointLight>());
         for chunk in query.par_iter_chunks(world) {
-            // This is guarenteed to be the same for each chunk
+            // This is guaranteed to be the same for each chunk
             let model = chunk.tag::<ModelHandle>().unwrap();
             let offset = *offset_map.get(model).unwrap_or(&0);
             let transforms = chunk.components::<Transform>().unwrap();
