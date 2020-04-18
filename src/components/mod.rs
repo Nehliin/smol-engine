@@ -1,5 +1,9 @@
+use crate::graphics::model::Model;
 use nalgebra::{Isometry3, Matrix4, Vector3};
 use nphysics3d::object::{DefaultBodyHandle, DefaultColliderHandle};
+use std::collections::HashMap;
+use zerocopy::AsBytes;
+
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct LightTag;
 
@@ -8,6 +12,10 @@ pub struct PhysicsBody {
     pub collider_handle: DefaultColliderHandle,
 }
 
+#[derive(Clone, PartialEq)]
+pub struct Cube;
+
+#[repr(C)]
 pub struct Transform {
     pub isometry: Isometry3<f32>,
     pub scale: Vector3<f32>,
@@ -15,10 +23,9 @@ pub struct Transform {
 // TODO: implement buildar macro or by hand (new builder struct)
 impl Transform {
     pub fn from_position(position: Vector3<f32>) -> Self {
-        Transform {
-            isometry: Isometry3::translation(position.x, position.y, position.z),
-            scale: Vector3::new(1.0, 1.0, 1.0),
-        }
+        let isometry = Isometry3::translation(position.x, position.y, position.z);
+        let scale = Vector3::new(1.0, 1.0, 1.0);
+        Transform { isometry, scale }
     }
 
     pub fn new(isometry: Isometry3<f32>, scale: Vector3<f32>) -> Self {
@@ -26,16 +33,27 @@ impl Transform {
     }
 
     pub fn get_model_matrix(&self) -> Matrix4<f32> {
-        self.isometry.to_homogeneous()
-            * Matrix4::new_nonuniform_scaling(&Vector3::new(
-                self.scale.x,
-                self.scale.y,
-                self.scale.z,
-            ))
+        self.isometry.to_homogeneous() * Matrix4::new_nonuniform_scaling(&self.scale)
     }
 
     pub fn translation(&self) -> Vector3<f32> {
         self.isometry.translation.vector
+    }
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Hash, Copy)]
+pub struct ModelHandle {
+    pub id: usize,
+}
+
+pub struct AssetManager {
+    pub asset_map: HashMap<ModelHandle, Model>,
+}
+impl AssetManager {
+    pub fn new() -> Self {
+        Self {
+            asset_map: HashMap::new(),
+        }
     }
 }
 
