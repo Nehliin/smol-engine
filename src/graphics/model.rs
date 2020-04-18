@@ -12,6 +12,8 @@ use wgpu::{
 };
 use zerocopy::AsBytes;
 
+const INDEX_BUFFER_SIZE: u64 = 16_000;
+
 #[repr(C)]
 #[derive(Copy, Clone, Debug, AsBytes)]
 pub struct MeshVertex {
@@ -197,7 +199,7 @@ impl Model {
         }
         let instance_buffer = device.create_buffer(&BufferDescriptor {
             label: Some("Instance buffer"),
-            size: 16_000 * 400, //TODO:  reallocate this if it's changed and minimize data
+            size: INDEX_BUFFER_SIZE, //TODO:  reallocate this if it's changed and minimize data
             usage: BufferUsage::VERTEX | BufferUsage::COPY_DST,
         });
         Ok((
@@ -218,7 +220,7 @@ pub trait DrawModel<'a> {
         material: &'a Material,
         instance_buffer: &'a Buffer,
         instances: Range<u32>,
-        uniforms: &'a wgpu::BindGroup,
+        //uniforms: &'a wgpu::BindGroup,
     );
 
     //fn draw_model(&'a mut self, model: &'a Model, uniforms: &'a wgpu::BindGroup);
@@ -226,7 +228,7 @@ pub trait DrawModel<'a> {
         &mut self,
         model: &'a Model,
         instances: Range<u32>,
-        uniforms: &'a wgpu::BindGroup,
+        // uniforms: &'a wgpu::BindGroup,
     );
 }
 
@@ -237,13 +239,13 @@ impl<'a> DrawModel<'a> for wgpu::RenderPass<'a> {
         material: &'a Material,
         instance_buffer: &'a Buffer,
         instances: Range<u32>,
-        uniforms: &'a wgpu::BindGroup,
+        //  uniforms: &'a wgpu::BindGroup,
     ) {
         self.set_vertex_buffer(0, &mesh.vertex_buffer, 0, 0);
         self.set_vertex_buffer(1, &instance_buffer, 0, 0);
         self.set_index_buffer(&mesh.index_buffer, 0, 0);
         self.set_bind_group(0, &material.bind_group, &[]);
-        self.set_bind_group(1, &uniforms, &[]);
+        //   self.set_bind_group(1, &uniforms, &[]);
         self.draw_indexed(0..mesh.num_indexes, 0, instances);
     }
 
@@ -255,12 +257,12 @@ impl<'a> DrawModel<'a> for wgpu::RenderPass<'a> {
         &mut self,
         model: &'a Model,
         instances: Range<u32>,
-        uniforms: &'a wgpu::BindGroup,
+        // uniforms: &'a wgpu::BindGroup,
     ) {
         let instance_buffer = &model.instance_buffer;
         for mesh in &model.meshes {
             let material = &model.materials[mesh.material];
-            self.draw_mesh_instanced(mesh, material, instance_buffer, instances.clone(), uniforms);
+            self.draw_mesh_instanced(mesh, material, instance_buffer, instances.clone());
         }
     }
 }

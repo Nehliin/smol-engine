@@ -1,3 +1,4 @@
+use crate::graphics::Pass;
 use crate::{
     components::{AssetManager, ModelHandle, Transform},
     graphics::model::MeshVertex,
@@ -9,15 +10,18 @@ use crate::{
     graphics::{PointLight, Shader, UniformBindGroup},
 };
 use anyhow::Result;
+use futures::SinkExt;
 use glsl_to_spirv::ShaderType;
 use legion::prelude::*;
+use nalgebra::{Matrix4, Vector3};
 use std::collections::HashMap;
 use wgpu::{
-    BindGroupLayout, BlendDescriptor, BufferUsage, ColorStateDescriptor, ColorWrite, CommandBuffer,
+    BindGroup, BindGroupLayout, BlendDescriptor, BufferUsage, ColorStateDescriptor, ColorWrite,
     CommandEncoder, CullMode, Device, FrontFace, IndexFormat, PipelineLayoutDescriptor,
     PrimitiveTopology, RasterizationStateDescriptor, RenderPass, RenderPipeline,
     RenderPipelineDescriptor, ShaderStage, TextureFormat, VertexStateDescriptor,
 };
+use zerocopy::AsBytes;
 
 pub struct ModelPass {
     render_pipeline: RenderPipeline,
@@ -28,8 +32,6 @@ impl ModelPass {
     pub fn new(
         device: &Device,
         incoming_layouts: Vec<&BindGroupLayout>,
-        //texture_layout: &BindGroupLayout,
-        //main_bind_group_layout: &BindGroupLayout,
         color_format: TextureFormat,
     ) -> Result<Self> {
         let vs_shader = Shader::new(
@@ -92,97 +94,93 @@ impl ModelPass {
             light_uniforms,
         })
     }
-    // fett hacky
-    pub fn update_lights(&mut self, world: &mut World, device: &mut Device) -> Vec<CommandBuffer> {
-        let query = <(Write<PointLight>, Read<Transform>)>::query();
-        let mut command_buffers = Vec::new();
-        for chunk in query.iter_chunks_mut(world) {
-            let mut lights = chunk.components_mut::<PointLight>().unwrap();
+    // TODO: fett hacky
+    pub fn update_lights(&self, world: &World, device: &Device, encoder: &mut CommandEncoder) {
+        let query = <(Read<PointLight>, Read<Transform>)>::query();
+        for chunk in query.par_iter_chunks(world) {
+            let lights = chunk.components::<PointLight>().unwrap();
             let positions = chunk.components::<Transform>().unwrap();
-            let mut uniform_data = [PointLightRaw::from(PointLight::default()); 16];
+            let mut uniform_data =
+                [PointLightRaw::from((PointLight::default(), Vector3::new(0.0, 0.0, 0.0))); 16];
             let mut lights_used = 0;
             lights
-                .iter_mut()
+                .iter()
                 .zip(positions.iter())
                 .enumerate()
                 .for_each(|(i, (light, pos))| {
-                    light.position = pos.translation(); // Should not be part of pointlight
-                    uniform_data[i] = PointLightRaw::from(*light);
+                    uniform_data[i] = PointLightRaw::from((*light, pos.translation()));
                     lights_used += 1;
                 });
-
-            command_buffers.push(self.light_uniforms.update(
+            self.light_uniforms.update(
                 device,
-                LightUniforms {
+                &LightUniforms {
                     lights_used,
                     pad: [0; 3],
                     point_lights: uniform_data,
                 },
-            ));
+                encoder,
+            );
         }
-        command_buffers
     }
+}
 
-    pub fn update_instances(
-        resources: &Resources,
-        world: &mut World,
+impl Pass for ModelPass {
+    fn update_uniform_data(
+        &self,
+        world: &World,
+        asset_manager: &AssetManager,
+        device: &Device,
         encoder: &mut CommandEncoder,
-        device: &mut Device,
     ) {
+        self.update_lights(world, device, encoder);
         let mut offsets = HashMap::new();
         let query = <(Read<Transform>, Tagged<ModelHandle>)>::query();
-        let asset_manager = resources.get::<AssetManager>().unwrap();
-        for chunk in query.iter_chunks(world) {
+        for chunk in query.par_iter_chunks(world) {
             let model = chunk.tag::<ModelHandle>().unwrap();
             let transforms = chunk.components::<Transform>().unwrap();
-            let transforms = transforms
+            let model_matrices = transforms
                 .iter()
-                .map(|trans| trans.as_bytes())
-                .flatten()
-                .copied()
-                .collect::<Vec<u8>>();
+                .map(|trans| trans.get_model_matrix())
+                .collect::<Vec<Matrix4<f32>>>();
+            // Safety the vector is owned within the same scope so this slice is also valid within
+            // the same scope
+            let data = unsafe {
+                std::slice::from_raw_parts(
+                    model_matrices.as_ptr() as *const u8,
+                    model_matrices.len() * std::mem::size_of::<Matrix4<f32>>(),
+                )
+            };
             let offset = *offsets.get(model).unwrap_or(&0);
-            let temp_buf = device.create_buffer_with_data(
-                transforms.as_slice(),
-                BufferUsage::VERTEX | BufferUsage::COPY_SRC,
-            );
+            let temp_buf =
+                device.create_buffer_with_data(data, BufferUsage::VERTEX | BufferUsage::COPY_SRC);
             let instance_buffer = &asset_manager.asset_map.get(model).unwrap().instance_buffer;
-            encoder.copy_buffer_to_buffer(
-                &temp_buf,
-                0,
-                instance_buffer,
-                offset,
-                transforms.len() as u64,
-            );
-            offsets.insert(model.clone(), offset + transforms.len() as u64);
+            encoder.copy_buffer_to_buffer(&temp_buf, 0, instance_buffer, offset, data.len() as u64);
+            offsets.insert(model.clone(), offset + model_matrices.len() as u64);
         }
     }
 
-    pub fn render<'pass, 'encoder: 'pass>(
+    fn render<'encoder>(
         &'encoder self,
-        main_bind_group: &'encoder UniformBindGroup<CameraDataRaw>,
+        global_bind_groups: &[&'encoder BindGroup],
         asset_manager: &'encoder AssetManager,
-        world: &'encoder mut World,
-        render_pass: &'pass mut RenderPass<'encoder>,
+        world: &World,
+        render_pass: &mut RenderPass<'encoder>,
     ) {
         render_pass.set_pipeline(&self.render_pipeline);
+        render_pass.set_bind_group(1, global_bind_groups[0], &[]);
+        render_pass.set_bind_group(2, &self.light_uniforms.bind_group, &[]);
         let mut offset_map = HashMap::new();
         let query =
             <(Read<Transform>, Tagged<ModelHandle>)>::query().filter(!component::<PointLight>());
-        for chunk in query.iter_chunks(world) {
+        for chunk in query.par_iter_chunks(world) {
             // This is guarenteed to be the same for each chunk
             let model = chunk.tag::<ModelHandle>().unwrap();
             let offset = *offset_map.get(model).unwrap_or(&0);
             let transforms = chunk.components::<Transform>().unwrap();
             offset_map.insert(model.clone(), offset + transforms.len());
             let model = asset_manager.asset_map.get(model).unwrap();
-            // println!("{}", transforms.len());
-            render_pass.set_bind_group(2, &self.light_uniforms.bind_group, &[]);
-            render_pass.draw_model_instanced(
-                model,
-                offset as u32..(offset + transforms.len()) as u32, //TODO: must use the same offset map probably?
-                &main_bind_group.bind_group,
-            );
+            render_pass
+                .draw_model_instanced(model, offset as u32..(offset + transforms.len()) as u32);
         }
     }
 }

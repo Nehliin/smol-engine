@@ -1,10 +1,8 @@
 use nalgebra::Vector3;
 use zerocopy::AsBytes;
 
-#[repr(C)]
 #[derive(Copy, Clone, Debug)]
 pub struct PointLight {
-    pub position: Vector3<f32>,
     pub ambient: Vector3<f32>,
     pub specular: Vector3<f32>,
     pub diffuse: Vector3<f32>,
@@ -30,10 +28,10 @@ pub struct PointLightRaw {
     _pad4: f32,
 }
 
-impl From<PointLight> for PointLightRaw {
-    fn from(light: PointLight) -> Self {
+impl From<(PointLight, Vector3<f32>)> for PointLightRaw {
+    fn from((light, position): (PointLight, Vector3<f32>)) -> Self {
         PointLightRaw {
-            position: [light.position.x, light.position.y, light.position.z],
+            position: [position.x, position.y, position.z],
             ambient: [light.ambient.x, light.ambient.y, light.ambient.z],
             specular: [light.specular.x, light.specular.y, light.specular.z],
             diffuse: [light.diffuse.x, light.diffuse.y, light.diffuse.z],
@@ -56,7 +54,6 @@ impl Default for PointLight {
         let quadratic = 0.032;
 
         PointLight {
-            position: Vector3::new(0.0, 0.0, 0.0),
             ambient: Vector3::new(0.01, 0.01, 0.01),
             specular: Vector3::new(1.0, 1.0, 1.0),
             diffuse: Vector3::new(1.0, 1.0, 1.0),

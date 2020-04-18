@@ -150,8 +150,8 @@ impl State for BasicState {
         );
         let mut components = Vec::new();
 
-        for x in 0..100 {
-            for y in 0..100 {
+        for x in 0..10 {
+            for y in 0..10 {
                 components.push((Transform::new(
                     Isometry3::translation(x as f32, -1.75, y as f32),
                     Vector3::new(0.2, 0.2, 0.2),

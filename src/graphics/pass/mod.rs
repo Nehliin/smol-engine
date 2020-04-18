@@ -1,6 +1,7 @@
-use legion::prelude::{Resources, World};
-use wgpu::{CommandBuffer, CommandEncoder, VertexBufferDescriptor};
-use wgpu::{Device, SwapChainOutput};
+use crate::components::AssetManager;
+use legion::prelude::World;
+use wgpu::Device;
+use wgpu::{BindGroup, CommandEncoder, RenderPass, VertexBufferDescriptor};
 
 pub mod light_object_pass;
 pub mod model_pass;
@@ -10,18 +11,18 @@ pub trait VBDesc {
 }
 
 pub trait Pass {
-    //fn new(device: &mut Device) -> Box<Self>;
-    fn update_uniforms(
-        &mut self,
-        world: &World,
-        resources: &mut Resources,
-        device: &mut Device,
-    ) -> CommandBuffer;
-    fn draw(
+    fn update_uniform_data(
         &self,
         world: &World,
-        resources: &mut Resources,
-        frame: &SwapChainOutput,
+        asset_manager: &AssetManager,
+        device: &Device,
         encoder: &mut CommandEncoder,
+    );
+    fn render<'encoder>(
+        &'encoder self,
+        global_bind_groups: &[&'encoder BindGroup],
+        asset_manager: &'encoder AssetManager,
+        world: &World,
+        render_pass: &mut RenderPass<'encoder>,
     );
 }

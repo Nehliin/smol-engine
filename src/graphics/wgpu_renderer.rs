@@ -3,8 +3,8 @@ use legion::prelude::{Resources, World};
 use wgpu::{
     Adapter, BackendBit, BindGroupLayout, BindGroupLayoutDescriptor, BindGroupLayoutEntry, Binding,
     BindingResource, BindingType, Buffer, BufferAddress, BufferDescriptor, BufferUsage, Color,
-    CommandBuffer, CommandEncoderDescriptor, Device, DeviceDescriptor, Extensions, Extent3d,
-    LoadOp, PowerPreference, PresentMode, Queue, RenderPassColorAttachmentDescriptor,
+    CommandBuffer, CommandEncoder, CommandEncoderDescriptor, Device, DeviceDescriptor, Extensions,
+    Extent3d, LoadOp, PowerPreference, PresentMode, Queue, RenderPassColorAttachmentDescriptor,
     RenderPassDepthStencilAttachmentDescriptor, RenderPassDescriptor, RequestAdapterOptions,
     ShaderStage, StoreOp, Surface, SwapChain, SwapChainDescriptor, Texture, TextureComponentType,
     TextureDimension, TextureFormat, TextureUsage, TextureView, TextureViewDimension,
@@ -16,7 +16,7 @@ use crate::graphics::model::Model;
 use crate::graphics::pass::light_object_pass::LightObjectPass;
 use crate::graphics::pass::model_pass::ModelPass;
 use crate::graphics::uniform_bind_groups::CameraDataRaw;
-use crate::graphics::{UniformBindGroup, UniformCameraData};
+use crate::graphics::{Pass, UniformBindGroup, UniformCameraData};
 
 //type RenderPass = Box<dyn Pass>;
 
@@ -197,35 +197,31 @@ impl WgpuRenderer {
             .create_swap_chain(&self.surface, &self.swap_chain_desc);
     }
 
-    fn update_camera_uniforms(&mut self, camera: &Camera) -> CommandBuffer {
+    fn update_camera_uniforms(&mut self, camera: &Camera, encoder: &mut CommandEncoder) {
         self.camera_uniforms.update(
             &mut self.device,
-            UniformCameraData {
+            &UniformCameraData {
                 view_matrix: *camera.get_view_matrix(),
                 projection: *camera.get_projection_matrix(),
                 view_pos: camera.get_vec_position(),
             }
             .into(),
+            encoder,
         )
     }
 
     pub fn render_frame(&mut self, world: &mut World, resources: &mut Resources) {
         let frame = self.swap_chain.get_next_texture().unwrap();
-        let mut command_buffers = Vec::new();
         let camera = resources.get::<Camera>().unwrap();
-        let commands = self.update_camera_uniforms(&camera);
-        command_buffers.push(commands);
-        let commands = self.model_pass.update_lights(world, &mut self.device);
-        command_buffers.extend(commands.into_iter());
         let mut encoder = self
             .device
             .create_command_encoder(&CommandEncoderDescriptor {
                 label: Some("Model render pass"),
             });
-
+        self.update_camera_uniforms(&camera, &mut encoder);
         let asset_manager = resources.get::<AssetManager>().unwrap();
-
-        ModelPass::update_instances(resources, world, &mut encoder, &mut self.device);
+        self.model_pass
+            .update_uniform_data(&world, &asset_manager, &self.device, &mut encoder);
         {
             let mut render_pass = encoder.begin_render_pass(&RenderPassDescriptor {
                 color_attachments: &[RenderPassColorAttachmentDescriptor {
@@ -250,9 +246,8 @@ impl WgpuRenderer {
                     clear_stencil: 0,
                 }),
             });
-
             self.model_pass.render(
-                &self.camera_uniforms,
+                &[&self.camera_uniforms.bind_group],
                 &asset_manager,
                 world,
                 &mut render_pass,
@@ -282,15 +277,14 @@ impl WgpuRenderer {
                     clear_stencil: 0,
                 }),
             });
+            //render_pass.set_bind_group(1, &self.camera_uniforms.bind_group, &[]);
             self.light_pass.render(
-                &self.camera_uniforms,
+                &[&self.camera_uniforms.bind_group],
                 &asset_manager,
                 world,
                 &mut render_pass,
             );
         }
-        command_buffers.push(encoder.finish());
-
-        self.queue.submit(&command_buffers);
+        self.queue.submit(&[encoder.finish()]);
     }
 }

@@ -19,9 +19,8 @@ pub struct Time {
     pub delta_time: f32,
 }
 
-pub struct Engine {
-    // renderer: R,
-    tmp_wgpu_renderer: WgpuRenderer,
+pub struct Engine<R> {
+    renderer: R,
     current_state: Box<dyn State>,
     // ECS
     world: World,
@@ -35,7 +34,7 @@ pub struct Engine {
 pub const WINDOW_HEIGHT: u32 = 1200;
 pub const WINDOW_WIDTH: u32 = 1600;
 
-impl Engine {
+impl Engine<WgpuRenderer> {
     //noinspection ALL
     // TODO: make builder instead
     pub fn new(name: impl AsRef<str>, start_state: Box<dyn State>) -> Self {
@@ -68,7 +67,7 @@ impl Engine {
             current_time: glfw.get_time() as f32,
             delta_time: 0.0,
         });
-        let wgpu_renderer = futures::executor::block_on(WgpuRenderer::new(&window, &mut resources));
+        let renderer = futures::executor::block_on(WgpuRenderer::new(&window, &mut resources));
 
         let camera = Camera::new(
             Point3::new(0., 0., 3.),
@@ -79,7 +78,7 @@ impl Engine {
         resources.insert(camera);
         Engine {
             //       renderer,
-            tmp_wgpu_renderer: wgpu_renderer,
+            renderer,
             current_state: start_state,
             world,
             resources,
@@ -108,7 +107,7 @@ impl Engine {
             self.process_events();
             self.current_state
                 .update(&mut self.world, &mut self.resources);
-            self.tmp_wgpu_renderer
+            self.renderer
                 .render_frame(&mut self.world, &mut self.resources);
             self.glfw.poll_events();
         }
@@ -117,9 +116,9 @@ impl Engine {
     fn process_events(&mut self) {
         for (_, event) in glfw::flush_messages(&self.events) {
             match event {
-                glfw::WindowEvent::FramebufferSize(width, height) => unsafe {
-                    self.tmp_wgpu_renderer.resize(width as u32, height as u32);
-                },
+                glfw::WindowEvent::FramebufferSize(width, height) => {
+                    self.renderer.resize(width as u32, height as u32);
+                }
                 glfw::WindowEvent::Key(key, _, action, _) => {
                     if self.current_state.handle_event(
                         InputEvent::KeyAction { key, action },

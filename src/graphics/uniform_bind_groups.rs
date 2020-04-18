@@ -1,9 +1,10 @@
 use crate::graphics::point_light::PointLightRaw;
 use nalgebra::{Matrix4, Vector3};
+use std::marker::PhantomData;
 use wgpu::{
     BindGroup, BindGroupDescriptor, BindGroupLayout, BindGroupLayoutDescriptor,
     BindGroupLayoutEntry, Binding, BindingResource, BindingType, Buffer, BufferAddress,
-    BufferDescriptor, BufferUsage, CommandBuffer, CommandEncoderDescriptor, Device, ShaderStage,
+    BufferDescriptor, BufferUsage, CommandEncoder, Device, ShaderStage,
 };
 use zerocopy::AsBytes;
 use zerocopy::FromBytes;
@@ -67,14 +68,14 @@ pub struct LightUniforms {
     pub(crate) point_lights: [PointLightRaw; 16],
 }
 
-pub struct UniformBindGroup<T: Default> {
+pub struct UniformBindGroup<T> {
     pub buffer: Buffer,
     pub bind_group: BindGroup,
     pub bind_group_layout: BindGroupLayout,
-    pub data: T,
+    _marker: PhantomData<T>,
 }
 
-impl<T: Default + AsBytes> UniformBindGroup<T> {
+impl<T: AsBytes> UniformBindGroup<T> {
     pub fn new(device: &Device, visibility: ShaderStage) -> Self {
         let buffer = device.create_buffer(&BufferDescriptor {
             label: Some("Uniform buffer"),
@@ -107,24 +108,12 @@ impl<T: Default + AsBytes> UniformBindGroup<T> {
             bind_group,
             buffer,
             bind_group_layout,
-            data: T::default(),
+            _marker: PhantomData::default(),
         }
     }
 
-    pub fn update(&mut self, device: &mut Device, data: T) -> CommandBuffer {
-        //TODO: IS THIS UNSAFE??? I don't think so
-        self.data = data;
-        let data = unsafe {
-            std::slice::from_raw_parts(
-                &self.data as *const T as *const u8,
-                std::mem::size_of::<T>(),
-            )
-        };
-        let staging_buffer = device.create_buffer_with_data(data, BufferUsage::COPY_SRC);
-
-        let mut encoder = device.create_command_encoder(&CommandEncoderDescriptor {
-            label: Some("Uniform staging buffer"),
-        });
+    pub fn update(&self, device: &Device, data: &T, encoder: &mut CommandEncoder) {
+        let staging_buffer = device.create_buffer_with_data(data.as_bytes(), BufferUsage::COPY_SRC);
 
         encoder.copy_buffer_to_buffer(
             &staging_buffer,
@@ -133,6 +122,5 @@ impl<T: Default + AsBytes> UniformBindGroup<T> {
             0,
             std::mem::size_of::<T>() as BufferAddress,
         );
-        encoder.finish()
     }
 }

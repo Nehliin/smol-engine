@@ -1,14 +1,13 @@
 use crate::components::{AssetManager, ModelHandle, Transform};
-use crate::graphics::model::{DrawModel, InstanceData, MeshVertex, Model};
+use crate::graphics::model::{DrawModel, InstanceData, MeshVertex};
 use crate::graphics::pass::VBDesc;
-use crate::graphics::uniform_bind_groups::CameraDataRaw;
 use crate::graphics::wgpu_renderer::DEPTH_FORMAT;
-use crate::graphics::{PointLight, Shader, UniformBindGroup};
+use crate::graphics::{Pass, PointLight, Shader};
 use glsl_to_spirv::ShaderType;
 use legion::prelude::*;
 use wgpu::{
-    BindGroupLayout, BlendDescriptor, ColorStateDescriptor, ColorWrite, CullMode, Device,
-    FrontFace, IndexFormat, PipelineLayoutDescriptor, PrimitiveTopology,
+    BindGroup, BindGroupLayout, BlendDescriptor, ColorStateDescriptor, ColorWrite, CommandEncoder,
+    CullMode, Device, FrontFace, IndexFormat, PipelineLayoutDescriptor, PrimitiveTopology,
     RasterizationStateDescriptor, RenderPass, RenderPipeline, RenderPipelineDescriptor,
     TextureFormat, VertexStateDescriptor,
 };
@@ -79,26 +78,35 @@ impl LightObjectPass {
 
         Self { render_pipeline }
     }
+}
 
-    pub fn render<'pass, 'encoder: 'pass>(
+impl Pass for LightObjectPass {
+    fn update_uniform_data(
+        &self,
+        world: &World,
+        asset_manager: &AssetManager,
+        device: &Device,
+        encoder: &mut CommandEncoder,
+    ) {
+        todo!("Think if it's worth to update the specific model matrixes for this pass here");
+    }
+
+    fn render<'encoder>(
         &'encoder self,
-        main_bind_group: &'encoder UniformBindGroup<CameraDataRaw>,
+        global_bind_groups: &[&'encoder BindGroup],
         asset_manager: &'encoder AssetManager,
-        world: &'encoder mut World,
-        render_pass: &'pass mut RenderPass<'encoder>,
+        world: &World,
+        render_pass: &mut RenderPass<'encoder>,
     ) {
         render_pass.set_pipeline(&self.render_pipeline);
+        render_pass.set_bind_group(1, global_bind_groups[0], &[]);
         let query =
             <(Read<Transform>, Tagged<ModelHandle>)>::query().filter(component::<PointLight>());
-        for chunk in query.iter_chunks(world) {
+        for chunk in query.par_iter_chunks(world) {
             let model_handle = chunk.tag::<ModelHandle>().unwrap();
             let model = asset_manager.asset_map.get(model_handle).unwrap();
             let transforms = chunk.components::<Transform>().unwrap();
-            render_pass.draw_model_instanced(
-                model,
-                0..transforms.len() as u32,
-                &main_bind_group.bind_group,
-            )
+            render_pass.draw_model_instanced(model, 0..transforms.len() as u32)
         }
     }
 }
