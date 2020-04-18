@@ -150,7 +150,7 @@ impl WgpuRenderer {
 
         // TODO: this must be moved
         let (sphere_model, cmd_buffer_0) =
-            Model::load("light/untitled.obj", &device, &layout).unwrap();
+            Model::load("light/light_cube.obj", &device, &layout).unwrap();
         let (model, cmd_buffer) = Model::load("nanosuit/nanosuit.obj", &device, &layout).unwrap();
         let (cube_model, cmd_buffer_1) = Model::load("box/cube.obj", &device, &layout).unwrap();
         queue.submit(&cmd_buffer);
