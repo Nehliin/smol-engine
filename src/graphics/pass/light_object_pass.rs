@@ -1,4 +1,5 @@
-use crate::components::{AssetManager, ModelHandle, Transform};
+use crate::assets::{AssetManager, ModelHandle};
+use crate::components::Transform;
 use crate::graphics::model::{DrawModel, InstanceData, MeshVertex};
 use crate::graphics::pass::VBDesc;
 use crate::graphics::wgpu_renderer::DEPTH_FORMAT;
@@ -104,7 +105,7 @@ impl Pass for LightObjectPass {
             <(Read<Transform>, Tagged<ModelHandle>)>::query().filter(component::<PointLight>());
         for chunk in query.par_iter_chunks(world) {
             let model_handle = chunk.tag::<ModelHandle>().unwrap();
-            let model = asset_manager.asset_map.get(model_handle).unwrap();
+            let model = asset_manager.get_model(model_handle).unwrap();
             let transforms = chunk.components::<Transform>().unwrap();
             render_pass.draw_model_instanced(model, 0..transforms.len() as u32)
         }

@@ -1,5 +1,3 @@
-#![allow(dead_code)]
-
 use nalgebra::geometry::Perspective3;
 use nalgebra::{Matrix4, Point3, Vector3};
 

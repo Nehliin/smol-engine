@@ -41,21 +41,5 @@ impl Transform {
     }
 }
 
-#[derive(Clone, Debug, PartialEq, Eq, Hash, Copy)]
-pub struct ModelHandle {
-    pub id: usize,
-}
-
-pub struct AssetManager {
-    pub asset_map: HashMap<ModelHandle, Model>,
-}
-impl AssetManager {
-    pub fn new() -> Self {
-        Self {
-            asset_map: HashMap::new(),
-        }
-    }
-}
-
 #[derive(Clone, PartialEq)]
 pub struct Selected;

@@ -1,6 +1,6 @@
 use crate::camera::Camera;
 //use crate::components::Selected;
-use crate::components::{Cube, LightTag, ModelHandle, Transform};
+use crate::components::{Cube, LightTag, Transform};
 use crate::engine::{InputEvent, Time, WINDOW_HEIGHT, WINDOW_WIDTH};
 use crate::physics::Physics;
 use glfw::{Action, Key};
@@ -11,6 +11,7 @@ use nphysics3d::object::BodyStatus;
 use std::collections::HashMap;
 
 use super::State;
+use crate::assets::AssetManager;
 use crate::graphics::model::Model;
 use crate::graphics::PointLight;
 
@@ -37,9 +38,10 @@ const CAMERA_SPEED: f32 = 4.5;
 
 impl State for BasicState {
     fn start(&mut self, world: &mut World, resources: &mut Resources) {
-        let suit_handle = ModelHandle { id: 0 };
-        let cube_handle = ModelHandle { id: 1 };
-        let sphere_handle = ModelHandle { id: 2 };
+        let mut asset_manager = resources.get_mut::<AssetManager>().unwrap();
+        let suit_handle = asset_manager.load_model("nanosuit/nanosuit.obj").unwrap();
+        let cube_handle = asset_manager.load_model("box/cube.obj").unwrap();
+        let sphere_handle = asset_manager.load_model("light/light_cube.obj").unwrap();
         /*let physicis = Physics::new(resources);
         let schedule = Schedule::builder().add_system(physicis.system).build();
 
@@ -134,7 +136,7 @@ impl State for BasicState {
             Vector3::new(0.0, 0.0, -3.0),
         ];
         world.insert(
-            (sphere_handle, ()),
+            (sphere_handle.clone(), ()),
             light_positions.iter().map(|&position| {
                 (
                     Transform::new(
@@ -160,7 +162,7 @@ impl State for BasicState {
         }
 
         world.insert(
-            (suit_handle, ()), // selected
+            (suit_handle.clone(), ()), // selected
             components,
         );
         let floor_transform = Transform::new(
@@ -170,7 +172,7 @@ impl State for BasicState {
             ),
             Vector3::new(0.1, 10.0, 10.0),
         );
-        world.insert((cube_handle, ()), vec![(floor_transform,)]);
+        world.insert((cube_handle.clone(), ()), vec![(floor_transform,)]);
 
         let cube_positions = vec![
             Vector3::new(0.0, -3.0, 0.0),
@@ -186,7 +188,7 @@ impl State for BasicState {
         ];
 
         world.insert(
-            (cube_handle, ()),
+            (cube_handle.clone(), ()),
             cube_positions.iter().map(|&position| {
                 let transform = Transform::new(
                     Isometry3::translation(position.x, position.y, position.z),

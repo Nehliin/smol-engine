@@ -1,4 +1,4 @@
-use crate::components::AssetManager;
+use crate::assets::AssetManager;
 use legion::prelude::World;
 use wgpu::Device;
 use wgpu::{BindGroup, CommandEncoder, RenderPass, VertexBufferDescriptor};

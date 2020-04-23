@@ -2,13 +2,15 @@ use crate::graphics::pass::VBDesc;
 use crate::graphics::texture::Texture;
 use anyhow::Result;
 use nalgebra::{Matrix4, Vector3};
+use once_cell::sync::OnceCell;
 use std::ops::Range;
 use std::path::Path;
 use wgpu::{
-    BindGroup, BindGroupDescriptor, BindGroupLayout, BindGroupLayoutEntry, Binding,
-    BindingResource, BindingType, Buffer, BufferAddress, BufferDescriptor, BufferUsage,
-    CommandBuffer, Device, InputStepMode, ShaderStage, TextureViewDimension,
-    VertexAttributeDescriptor, VertexBufferDescriptor, VertexFormat,
+    BindGroup, BindGroupDescriptor, BindGroupLayout, BindGroupLayoutDescriptor,
+    BindGroupLayoutEntry, Binding, BindingResource, BindingType, Buffer, BufferAddress,
+    BufferDescriptor, BufferUsage, CommandBuffer, Device, InputStepMode, ShaderStage,
+    TextureComponentType, TextureViewDimension, VertexAttributeDescriptor, VertexBufferDescriptor,
+    VertexFormat,
 };
 use zerocopy::AsBytes;
 
@@ -106,11 +108,49 @@ pub struct Model {
 }
 
 impl Model {
-    pub fn load(
-        path: impl AsRef<Path>,
-        device: &Device,
-        layout: &BindGroupLayout,
-    ) -> Result<(Self, Vec<CommandBuffer>)> {
+    // TODO: Create a trait for this?
+    pub fn get_or_create_texture_layout(device: &Device) -> &'static BindGroupLayout {
+        static LAYOUT: OnceCell<BindGroupLayout> = OnceCell::new();
+        LAYOUT.get_or_init(|| {
+            device.create_bind_group_layout(&BindGroupLayoutDescriptor {
+                bindings: &[
+                    // diffuse texture
+                    BindGroupLayoutEntry {
+                        binding: 0,
+                        visibility: ShaderStage::FRAGMENT,
+                        ty: BindingType::SampledTexture {
+                            multisampled: false,
+                            dimension: TextureViewDimension::D2,
+                            component_type: TextureComponentType::Float,
+                        },
+                    },
+                    BindGroupLayoutEntry {
+                        binding: 1,
+                        visibility: ShaderStage::FRAGMENT,
+                        ty: BindingType::Sampler { comparison: true },
+                    },
+                    // specular texutre
+                    BindGroupLayoutEntry {
+                        binding: 2,
+                        visibility: ShaderStage::FRAGMENT,
+                        ty: BindingType::SampledTexture {
+                            multisampled: false,
+                            dimension: TextureViewDimension::D2,
+                            component_type: TextureComponentType::Float,
+                        },
+                    },
+                    BindGroupLayoutEntry {
+                        binding: 3,
+                        visibility: ShaderStage::FRAGMENT,
+                        ty: BindingType::Sampler { comparison: true },
+                    },
+                ],
+                label: Some("Texture layout"),
+            })
+        })
+    }
+
+    pub fn load(path: impl AsRef<Path>, device: &Device) -> Result<(Self, Vec<CommandBuffer>)> {
         let (obj_models, obj_materials) = tobj::load_obj(path.as_ref())?;
         let current_folder = path.as_ref().parent().unwrap_or_else(|| {
             panic!(
@@ -131,9 +171,11 @@ impl Model {
             }
             let (diffuse_texture, diffuse_commands) =
                 Texture::load(&device, current_folder.join(diffuse_path))?;
-
             let (specular_texture, specular_command) =
                 Texture::load(&device, current_folder.join(specular_path))?;
+
+            let layout = Self::get_or_create_texture_layout(device);
+
             let bind_group = device.create_bind_group(&BindGroupDescriptor {
                 layout,
                 bindings: &[
@@ -199,7 +241,7 @@ impl Model {
         }
         let instance_buffer = device.create_buffer(&BufferDescriptor {
             label: Some("Instance buffer"),
-            size: INDEX_BUFFER_SIZE, //TODO:  reallocate this if it's changed and minimize data
+            size: INDEX_BUFFER_SIZE, //TODO: reallocate is if it's changed and minimize data
             usage: BufferUsage::VERTEX | BufferUsage::COPY_DST,
         });
         Ok((
@@ -220,16 +262,9 @@ pub trait DrawModel<'a> {
         material: &'a Material,
         instance_buffer: &'a Buffer,
         instances: Range<u32>,
-        //uniforms: &'a wgpu::BindGroup,
     );
 
-    //fn draw_model(&'a mut self, model: &'a Model, uniforms: &'a wgpu::BindGroup);
-    fn draw_model_instanced(
-        &mut self,
-        model: &'a Model,
-        instances: Range<u32>,
-        // uniforms: &'a wgpu::BindGroup,
-    );
+    fn draw_model_instanced(&mut self, model: &'a Model, instances: Range<u32>);
 }
 
 impl<'a> DrawModel<'a> for wgpu::RenderPass<'a> {
@@ -239,26 +274,15 @@ impl<'a> DrawModel<'a> for wgpu::RenderPass<'a> {
         material: &'a Material,
         instance_buffer: &'a Buffer,
         instances: Range<u32>,
-        //  uniforms: &'a wgpu::BindGroup,
     ) {
         self.set_vertex_buffer(0, &mesh.vertex_buffer, 0, 0);
         self.set_vertex_buffer(1, &instance_buffer, 0, 0);
         self.set_index_buffer(&mesh.index_buffer, 0, 0);
         self.set_bind_group(0, &material.bind_group, &[]);
-        //   self.set_bind_group(1, &uniforms, &[]);
         self.draw_indexed(0..mesh.num_indexes, 0, instances);
     }
 
-    /*fn draw_model(&'a mut self, model: &'a Model, uniforms: &'a wgpu::BindGroup) {
-        self.draw_model_instanced(model, 0..1, uniforms);
-    }*/
-
-    fn draw_model_instanced(
-        &mut self,
-        model: &'a Model,
-        instances: Range<u32>,
-        // uniforms: &'a wgpu::BindGroup,
-    ) {
+    fn draw_model_instanced(&mut self, model: &'a Model, instances: Range<u32>) {
         let instance_buffer = &model.instance_buffer;
         for mesh in &model.meshes {
             let material = &model.materials[mesh.material];

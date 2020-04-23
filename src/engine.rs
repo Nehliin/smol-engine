@@ -1,6 +1,8 @@
+use crate::assets::AssetManager;
 use crate::camera::Camera;
 use crate::graphics::{Renderer, WgpuRenderer};
 use crate::states::State;
+use crossbeam_utils::thread;
 use glfw::{Action, Context, Glfw, Key, MouseButton, Window, WindowEvent};
 use legion::prelude::*;
 use nalgebra::{Point3, Vector3};
@@ -67,8 +69,10 @@ impl Engine<WgpuRenderer> {
             current_time: glfw.get_time() as f32,
             delta_time: 0.0,
         });
-        let renderer = futures::executor::block_on(WgpuRenderer::new(&window, &mut resources));
 
+        let asset_manager = AssetManager::new();
+        let renderer = futures::executor::block_on(WgpuRenderer::new(&window));
+        resources.insert(asset_manager);
         let camera = Camera::new(
             Point3::new(0., 0., 3.),
             Vector3::new(0.0, 0.0, -1.0),
@@ -77,7 +81,6 @@ impl Engine<WgpuRenderer> {
         );
         resources.insert(camera);
         Engine {
-            //       renderer,
             renderer,
             current_state: start_state,
             world,
@@ -107,7 +110,7 @@ impl Engine<WgpuRenderer> {
             self.process_events();
             self.current_state
                 .update(&mut self.world, &mut self.resources);
-            self.renderer.render_frame(&self.world, &self.resources);
+            self.renderer.render_frame(&self.world, &mut self.resources);
             self.glfw.poll_events();
         }
     }
