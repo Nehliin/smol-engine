@@ -1,5 +1,0 @@
-{
-    "editor.formatOnSave": true,
-    "rust-analyzer.highlighting.semanticTokens": true,
-    "editor.semanticHighlighting.enabled": false,
-}
