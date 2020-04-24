@@ -1,9 +1,8 @@
 use crate::assets::AssetManager;
 use crate::camera::Camera;
-use crate::graphics::{Renderer, WgpuRenderer};
+use crate::graphics::WgpuRenderer;
 use crate::states::State;
-use crossbeam_utils::thread;
-use glfw::{Action, Context, Glfw, Key, MouseButton, Window, WindowEvent};
+use glfw::{Action, Glfw, Key, MouseButton, Window, WindowEvent};
 use legion::prelude::*;
 use nalgebra::{Point3, Vector3};
 use std::io::Write;
@@ -100,7 +99,9 @@ impl Engine<WgpuRenderer> {
         while !self.window.should_close() {
             let current_frame = self.glfw.get_time() as f32;
             let delta_time = current_frame - last_frame;
-            handle.write_fmt(format_args!("fps: {}\n", 1.0 / delta_time));
+            handle
+                .write_fmt(format_args!("fps: {}\n", 1.0 / delta_time))
+                .unwrap();
             last_frame = current_frame;
             {
                 let mut time = self.resources.get_mut::<Time>().unwrap();

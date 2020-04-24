@@ -1,12 +1,8 @@
 use crate::graphics::model::Model;
 use anyhow::{anyhow, Result};
-use crossbeam_channel::{Receiver, Sender};
-use image::load;
 use std::collections::{HashMap, VecDeque};
 use std::ffi::OsString;
 use std::path::{Path, PathBuf};
-use std::sync::mpsc::TryRecvError;
-use std::time::Duration;
 use wgpu::{CommandBuffer, Device};
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]

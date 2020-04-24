@@ -25,8 +25,8 @@ impl Shader {
             .with_context(|| format!("Failed to find {:x?}, shader file", path.as_ref()))?;
         let mut src = String::new();
         file.read_to_string(&mut src)?;
-        let spirv = glsl_to_spirv::compile(&src, shader_type)
-            .map_err(|err| ShaderLoadError::FailedToCompile(err))?;
+        let spirv =
+            glsl_to_spirv::compile(&src, shader_type).map_err(ShaderLoadError::FailedToCompile)?;
 
         let data = wgpu::read_spirv(spirv)?;
 

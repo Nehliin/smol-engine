@@ -1,8 +1,5 @@
-use crate::graphics::model::Model;
 use nalgebra::{Isometry3, Matrix4, Vector3};
 use nphysics3d::object::{DefaultBodyHandle, DefaultColliderHandle};
-use std::collections::HashMap;
-use zerocopy::AsBytes;
 
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct LightTag;

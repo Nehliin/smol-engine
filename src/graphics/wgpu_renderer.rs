@@ -1,23 +1,20 @@
 use glfw::Window;
 use legion::prelude::{Resources, World};
 use wgpu::{
-    Adapter, BackendBit, BindingResource, BindingType, Buffer, BufferAddress, BufferDescriptor,
-    BufferUsage, Color, CommandBuffer, CommandEncoder, CommandEncoderDescriptor, Device,
-    DeviceDescriptor, Extensions, Extent3d, LoadOp, PowerPreference, PresentMode, Queue,
+    Adapter, BackendBit, Color, CommandEncoder, CommandEncoderDescriptor, Device, DeviceDescriptor,
+    Extensions, Extent3d, LoadOp, PowerPreference, PresentMode, Queue,
     RenderPassColorAttachmentDescriptor, RenderPassDepthStencilAttachmentDescriptor,
     RenderPassDescriptor, RequestAdapterOptions, ShaderStage, StoreOp, Surface, SwapChain,
-    SwapChainDescriptor, Texture, TextureComponentType, TextureDimension, TextureFormat,
-    TextureUsage, TextureView, TextureViewDimension,
+    SwapChainDescriptor, Texture, TextureDimension, TextureFormat, TextureUsage, TextureView,
 };
 
-use crate::assets::{AssetManager, ModelHandle};
+use crate::assets::AssetManager;
 use crate::camera::Camera;
 use crate::graphics::model::Model;
 use crate::graphics::pass::light_object_pass::LightObjectPass;
 use crate::graphics::pass::model_pass::ModelPass;
 use crate::graphics::uniform_bind_groups::CameraDataRaw;
 use crate::graphics::{Pass, UniformBindGroup, UniformCameraData};
-use crossbeam_channel::{Receiver, Sender};
 
 //type RenderPass = Box<dyn Pass>;
 
@@ -45,7 +42,6 @@ fn create_depth_texture(
 
 pub struct WgpuRenderer {
     surface: Surface,
-    adapter: Adapter,
     pub device: Device,
     queue: Queue,
     swap_chain_desc: SwapChainDescriptor,
@@ -74,7 +70,7 @@ impl WgpuRenderer {
         .await
         .expect("Couldn't create wgpu adapter");
 
-        let (mut device, mut queue) = adapter
+        let (device, queue) = adapter
             .request_device(&DeviceDescriptor {
                 extensions: Extensions {
                     anisotropic_filtering: false,
@@ -116,7 +112,6 @@ impl WgpuRenderer {
 
         WgpuRenderer {
             surface,
-            adapter,
             device,
             queue,
             swap_chain_desc,
@@ -148,7 +143,7 @@ impl WgpuRenderer {
 
     fn update_camera_uniforms(&mut self, camera: &Camera, encoder: &mut CommandEncoder) {
         self.camera_uniforms.update(
-            &mut self.device,
+            &self.device,
             &UniformCameraData {
                 view_matrix: *camera.get_view_matrix(),
                 projection: *camera.get_projection_matrix(),

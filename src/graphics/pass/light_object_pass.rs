@@ -84,10 +84,10 @@ impl LightObjectPass {
 impl Pass for LightObjectPass {
     fn update_uniform_data(
         &self,
-        world: &World,
-        asset_manager: &AssetManager,
-        device: &Device,
-        encoder: &mut CommandEncoder,
+        _world: &World,
+        _asset_manager: &AssetManager,
+        _device: &Device,
+        _encoder: &mut CommandEncoder,
     ) {
         todo!("Think if it's worth to update the specific model matrixes for this pass here");
     }

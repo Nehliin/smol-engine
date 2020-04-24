@@ -1,22 +1,21 @@
 use crate::camera::Camera;
 //use crate::components::Selected;
-use crate::components::{Cube, LightTag, Transform};
+use crate::components::Transform;
 use crate::engine::{InputEvent, Time, WINDOW_HEIGHT, WINDOW_WIDTH};
-use crate::physics::Physics;
+//use crate::physics::Physics;
 use glfw::{Action, Key};
 use legion::prelude::*;
 use nalgebra::{Isometry3, Vector3};
 
-use nphysics3d::object::BodyStatus;
+//use nphysics3d::object::BodyStatus;
 use std::collections::HashMap;
 
 use super::State;
 use crate::assets::AssetManager;
-use crate::graphics::model::Model;
 use crate::graphics::PointLight;
 
 pub struct BasicState {
-    schedule: Option<Schedule>,
+    //  schedule: Option<Schedule>,
     first_mouse: bool,
     last_x: f32,
     last_y: f32,
@@ -26,7 +25,7 @@ pub struct BasicState {
 impl BasicState {
     pub fn new() -> Self {
         BasicState {
-            schedule: None,
+            //        schedule: None,
             first_mouse: true,
             last_y: (WINDOW_HEIGHT / 2) as f32, // TODO: ugly
             last_x: (WINDOW_WIDTH / 2) as f32,  // TODO: ugly
@@ -136,7 +135,7 @@ impl State for BasicState {
             Vector3::new(0.0, 0.0, -3.0),
         ];
         world.insert(
-            (sphere_handle.clone(), ()),
+            (sphere_handle, ()),
             light_positions.iter().map(|&position| {
                 (
                     Transform::new(
@@ -162,7 +161,7 @@ impl State for BasicState {
         }
 
         world.insert(
-            (suit_handle.clone(), ()), // selected
+            (suit_handle, ()), // selected
             components,
         );
         let floor_transform = Transform::new(
@@ -188,7 +187,7 @@ impl State for BasicState {
         ];
 
         world.insert(
-            (cube_handle.clone(), ()),
+            (cube_handle, ()),
             cube_positions.iter().map(|&position| {
                 let transform = Transform::new(
                     Isometry3::translation(position.x, position.y, position.z),
@@ -199,7 +198,7 @@ impl State for BasicState {
         );
     }
 
-    fn update(&mut self, world: &mut World, resources: &mut Resources) {
+    fn update(&mut self, _world: &mut World, _resources: &mut Resources) {
         /* self.schedule
         .as_mut()
         .expect("to be initializes")
@@ -214,7 +213,7 @@ impl State for BasicState {
     fn handle_event(
         &mut self,
         event: InputEvent,
-        world: &mut World,
+        _world: &mut World,
         resources: &mut Resources,
     ) -> bool {
         match event {
@@ -246,7 +245,10 @@ impl State for BasicState {
 
                 false
             }
-            InputEvent::MouseButton { button, action } => {
+            InputEvent::MouseButton {
+                button: _,
+                action: _,
+            } => {
                 /*   if action == Action::Press {
                     let transform = {
                         let camera = resources.get::<Camera>().unwrap();
