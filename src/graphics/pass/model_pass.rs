@@ -1,6 +1,7 @@
+use crate::assets::{AssetManager, ModelHandle};
 use crate::graphics::Pass;
 use crate::{
-    components::{AssetManager, ModelHandle, Transform},
+    components::Transform,
     graphics::model::MeshVertex,
     graphics::model::{DrawModel, InstanceData},
     graphics::pass::VBDesc,
@@ -151,7 +152,7 @@ impl Pass for ModelPass {
             let offset = *offsets.get(model).unwrap_or(&0);
             let temp_buf =
                 device.create_buffer_with_data(data, BufferUsage::VERTEX | BufferUsage::COPY_SRC);
-            let instance_buffer = &asset_manager.asset_map.get(model).unwrap().instance_buffer;
+            let instance_buffer = &asset_manager.get_model(model).unwrap().instance_buffer;
             encoder.copy_buffer_to_buffer(&temp_buf, 0, instance_buffer, offset, data.len() as u64);
             offsets.insert(model.clone(), offset + model_matrices.len() as u64);
         }
@@ -176,7 +177,7 @@ impl Pass for ModelPass {
             let offset = *offset_map.get(model).unwrap_or(&0);
             let transforms = chunk.components::<Transform>().unwrap();
             offset_map.insert(model.clone(), offset + transforms.len());
-            let model = asset_manager.asset_map.get(model).unwrap();
+            let model = asset_manager.get_model(model).unwrap();
             render_pass
                 .draw_model_instanced(model, offset as u32..(offset + transforms.len()) as u32);
         }

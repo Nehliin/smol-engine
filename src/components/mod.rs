@@ -1,8 +1,5 @@
-use crate::graphics::model::Model;
 use nalgebra::{Isometry3, Matrix4, Vector3};
 use nphysics3d::object::{DefaultBodyHandle, DefaultColliderHandle};
-use std::collections::HashMap;
-use zerocopy::AsBytes;
 
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct LightTag;
@@ -38,22 +35,6 @@ impl Transform {
 
     pub fn translation(&self) -> Vector3<f32> {
         self.isometry.translation.vector
-    }
-}
-
-#[derive(Clone, Debug, PartialEq, Eq, Hash, Copy)]
-pub struct ModelHandle {
-    pub id: usize,
-}
-
-pub struct AssetManager {
-    pub asset_map: HashMap<ModelHandle, Model>,
-}
-impl AssetManager {
-    pub fn new() -> Self {
-        Self {
-            asset_map: HashMap::new(),
-        }
     }
 }
 

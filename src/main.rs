@@ -1,3 +1,4 @@
+mod assets;
 mod camera;
 mod components;
 mod engine;

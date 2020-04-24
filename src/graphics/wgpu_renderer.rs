@@ -1,17 +1,15 @@
 use glfw::Window;
 use legion::prelude::{Resources, World};
 use wgpu::{
-    Adapter, BackendBit, BindGroupLayout, BindGroupLayoutDescriptor, BindGroupLayoutEntry, Binding,
-    BindingResource, BindingType, Buffer, BufferAddress, BufferDescriptor, BufferUsage, Color,
-    CommandBuffer, CommandEncoder, CommandEncoderDescriptor, Device, DeviceDescriptor, Extensions,
-    Extent3d, LoadOp, PowerPreference, PresentMode, Queue, RenderPassColorAttachmentDescriptor,
-    RenderPassDepthStencilAttachmentDescriptor, RenderPassDescriptor, RequestAdapterOptions,
-    ShaderStage, StoreOp, Surface, SwapChain, SwapChainDescriptor, Texture, TextureComponentType,
-    TextureDimension, TextureFormat, TextureUsage, TextureView, TextureViewDimension,
+    Adapter, BackendBit, Color, CommandEncoder, CommandEncoderDescriptor, Device, DeviceDescriptor,
+    Extensions, Extent3d, LoadOp, PowerPreference, PresentMode, Queue,
+    RenderPassColorAttachmentDescriptor, RenderPassDepthStencilAttachmentDescriptor,
+    RenderPassDescriptor, RequestAdapterOptions, ShaderStage, StoreOp, Surface, SwapChain,
+    SwapChainDescriptor, Texture, TextureDimension, TextureFormat, TextureUsage, TextureView,
 };
 
+use crate::assets::AssetManager;
 use crate::camera::Camera;
-use crate::components::{AssetManager, ModelHandle};
 use crate::graphics::model::Model;
 use crate::graphics::pass::light_object_pass::LightObjectPass;
 use crate::graphics::pass::model_pass::ModelPass;
@@ -44,8 +42,7 @@ fn create_depth_texture(
 
 pub struct WgpuRenderer {
     surface: Surface,
-    adapter: Adapter,
-    device: Device,
+    pub device: Device,
     queue: Queue,
     swap_chain_desc: SwapChainDescriptor,
     swap_chain: SwapChain,
@@ -56,12 +53,10 @@ pub struct WgpuRenderer {
     depth_texture_view: TextureView,
     model_pass: ModelPass,
     light_pass: LightObjectPass,
-    // Storing all the render passes
-    // render_passes: Vec<RenderPass>,
 }
 
 impl WgpuRenderer {
-    pub async fn new(window: &Window, resources: &mut Resources) -> Self {
+    pub async fn new(window: &Window) -> Self {
         let (width, height) = window.get_size();
 
         let surface = Surface::create(window);
@@ -73,9 +68,9 @@ impl WgpuRenderer {
             BackendBit::PRIMARY,
         )
         .await
-        .expect("Couln't create wgpu adapter");
+        .expect("Couldn't create wgpu adapter");
 
-        let (mut device, mut queue) = adapter
+        let (device, queue) = adapter
             .request_device(&DeviceDescriptor {
                 extensions: Extensions {
                     anisotropic_filtering: false,
@@ -94,80 +89,29 @@ impl WgpuRenderer {
 
         let swap_chain = device.create_swap_chain(&surface, &swap_chain_desc);
 
-        let camera_uniforms = UniformBindGroup::new(&mut device, ShaderStage::VERTEX);
+        let camera_uniforms = UniformBindGroup::new(&device, ShaderStage::VERTEX);
 
         let depth_texture = create_depth_texture(&device, &swap_chain_desc);
         let depth_texture_view = depth_texture.create_default_view();
 
-        let layout = device.create_bind_group_layout(&BindGroupLayoutDescriptor {
-            bindings: &[
-                // diffuse texture
-                BindGroupLayoutEntry {
-                    binding: 0,
-                    visibility: ShaderStage::FRAGMENT,
-                    ty: BindingType::SampledTexture {
-                        multisampled: false,
-                        dimension: TextureViewDimension::D2,
-                        component_type: TextureComponentType::Float,
-                    },
-                },
-                BindGroupLayoutEntry {
-                    binding: 1,
-                    visibility: ShaderStage::FRAGMENT,
-                    ty: BindingType::Sampler { comparison: true },
-                },
-                // specular texutre
-                BindGroupLayoutEntry {
-                    binding: 2,
-                    visibility: ShaderStage::FRAGMENT,
-                    ty: BindingType::SampledTexture {
-                        multisampled: false,
-                        dimension: TextureViewDimension::D2,
-                        component_type: TextureComponentType::Float,
-                    },
-                },
-                BindGroupLayoutEntry {
-                    binding: 3,
-                    visibility: ShaderStage::FRAGMENT,
-                    ty: BindingType::Sampler { comparison: true },
-                },
-            ],
-            label: Some("Texture tmp layout"),
-        });
-
         let model_pass = ModelPass::new(
             &device,
-            vec![&layout, &camera_uniforms.bind_group_layout],
+            vec![
+                Model::get_or_create_texture_layout(&device),
+                &camera_uniforms.bind_group_layout,
+            ],
             swap_chain_desc.format,
         )
         .unwrap();
         let light_pass = LightObjectPass::new(
             &device,
-            &layout,
+            &Model::get_or_create_texture_layout(&device),
             &camera_uniforms.bind_group_layout,
             swap_chain_desc.format,
         );
 
-        // TODO: this must be moved
-        let (sphere_model, cmd_buffer_0) =
-            Model::load("light/light_cube.obj", &device, &layout).unwrap();
-        let (model, cmd_buffer) = Model::load("nanosuit/nanosuit.obj", &device, &layout).unwrap();
-        let (cube_model, cmd_buffer_1) = Model::load("box/cube.obj", &device, &layout).unwrap();
-        queue.submit(&cmd_buffer);
-        queue.submit(&cmd_buffer_1);
-        queue.submit(&cmd_buffer_0);
-        let handle = ModelHandle { id: 0 };
-        let handle_2 = ModelHandle { id: 1 };
-        let handle_3 = ModelHandle { id: 2 };
-        let mut asset_manager = AssetManager::new();
-        asset_manager.asset_map.insert(handle, model);
-        asset_manager.asset_map.insert(handle_3, sphere_model);
-        asset_manager.asset_map.insert(handle_2, cube_model);
-        resources.insert(asset_manager);
-
         WgpuRenderer {
             surface,
-            adapter,
             device,
             queue,
             swap_chain_desc,
@@ -199,7 +143,7 @@ impl WgpuRenderer {
 
     fn update_camera_uniforms(&mut self, camera: &Camera, encoder: &mut CommandEncoder) {
         self.camera_uniforms.update(
-            &mut self.device,
+            &self.device,
             &UniformCameraData {
                 view_matrix: *camera.get_view_matrix(),
                 projection: *camera.get_projection_matrix(),
@@ -210,7 +154,8 @@ impl WgpuRenderer {
         )
     }
 
-    pub fn render_frame(&mut self, world: &World, resources: &Resources) {
+    // THIS SHOULD NOT REQUIRE MUTABLE REF TO RESOURCES!
+    pub fn render_frame(&mut self, world: &World, resources: &mut Resources) {
         let frame = self.swap_chain.get_next_texture().unwrap();
         let camera = resources.get::<Camera>().unwrap();
         let mut encoder = self
@@ -219,9 +164,11 @@ impl WgpuRenderer {
                 label: Some("Model render pass"),
             });
         self.update_camera_uniforms(&camera, &mut encoder);
-        let asset_manager = resources.get::<AssetManager>().unwrap();
+        let mut asset_storage = resources.get_mut::<AssetManager>().unwrap();
+        // TODO: This should be in an update method instead
+        let mut commands = asset_storage.clear_load_queue(&self.device);
         self.model_pass
-            .update_uniform_data(&world, &asset_manager, &self.device, &mut encoder);
+            .update_uniform_data(&world, &asset_storage, &self.device, &mut encoder);
         {
             let mut render_pass = encoder.begin_render_pass(&RenderPassDescriptor {
                 color_attachments: &[RenderPassColorAttachmentDescriptor {
@@ -248,7 +195,7 @@ impl WgpuRenderer {
             });
             self.model_pass.render(
                 &[&self.camera_uniforms.bind_group],
-                &asset_manager,
+                &asset_storage,
                 world,
                 &mut render_pass,
             );
@@ -277,14 +224,14 @@ impl WgpuRenderer {
                     clear_stencil: 0,
                 }),
             });
-            //render_pass.set_bind_group(1, &self.camera_uniforms.bind_group, &[]);
             self.light_pass.render(
                 &[&self.camera_uniforms.bind_group],
-                &asset_manager,
+                &asset_storage,
                 world,
                 &mut render_pass,
             );
         }
-        self.queue.submit(&[encoder.finish()]);
+        commands.push(encoder.finish());
+        self.queue.submit(&commands);
     }
 }

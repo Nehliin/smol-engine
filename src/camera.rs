@@ -1,5 +1,3 @@
-#![allow(dead_code)]
-
 use nalgebra::geometry::Perspective3;
 use nalgebra::{Matrix4, Point3, Vector3};
 
@@ -44,28 +42,8 @@ impl Camera {
     }
 
     #[inline]
-    pub fn set_direction(&mut self, direction: Vector3<f32>) {
-        self.direction = direction;
-        self.view_matrix = Matrix4::look_at_rh(
-            &self.position,
-            &(self.position + self.direction),
-            &Vector3::new(0.0, 1.0, 0.0),
-        );
-    }
-
-    #[inline]
-    pub fn get_position(&self) -> Point3<f32> {
-        self.position
-    }
-
-    #[inline]
     pub fn get_vec_position(&self) -> Vector3<f32> {
         to_vec(&self.position)
-    }
-
-    #[inline]
-    pub fn get_direction(&self) -> Vector3<f32> {
-        self.direction
     }
 
     #[inline]
