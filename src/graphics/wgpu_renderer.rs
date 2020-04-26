@@ -8,6 +8,7 @@ use wgpu::{
     SwapChainDescriptor, Texture, TextureDimension, TextureFormat, TextureUsage, TextureView,
 };
 
+use super::{pass::skybox_pass::SkyboxPass, skybox_texture::SkyboxTexture};
 use crate::assets::AssetManager;
 use crate::camera::Camera;
 use crate::graphics::model::Model;
@@ -53,6 +54,7 @@ pub struct WgpuRenderer {
     depth_texture_view: TextureView,
     model_pass: ModelPass,
     light_pass: LightObjectPass,
+    skybox_pass: SkyboxPass,
 }
 
 impl WgpuRenderer {
@@ -110,6 +112,20 @@ impl WgpuRenderer {
             swap_chain_desc.format,
         );
 
+        // TODO: should be handled as an asset instead
+        let (skybox_texture, command_buffer) = SkyboxTexture::load(&device, "skybox").unwrap();
+        queue.submit(&[command_buffer]);
+
+        let skybox_pass = SkyboxPass::new(
+            &device,
+            vec![
+                SkyboxTexture::get_bind_group_layout(&device),
+                &camera_uniforms.bind_group_layout,
+            ],
+            swap_chain_desc.format,
+            skybox_texture,
+        );
+
         WgpuRenderer {
             surface,
             device,
@@ -122,6 +138,7 @@ impl WgpuRenderer {
             depth_texture_view,
             model_pass,
             light_pass,
+            skybox_pass,
             camera_uniforms,
         }
     }
@@ -167,6 +184,31 @@ impl WgpuRenderer {
         let mut asset_storage = resources.get_mut::<AssetManager>().unwrap();
         // TODO: This should be in an update method instead
         let mut commands = asset_storage.clear_load_queue(&self.device);
+
+        {
+            let mut render_pass = encoder.begin_render_pass(&RenderPassDescriptor {
+                color_attachments: &[RenderPassColorAttachmentDescriptor {
+                    attachment: &frame.view,
+                    resolve_target: None,
+                    load_op: wgpu::LoadOp::Clear,
+                    store_op: wgpu::StoreOp::Store,
+                    clear_color: wgpu::Color {
+                        r: 0.1,
+                        g: 0.2,
+                        b: 0.3,
+                        a: 1.0,
+                    },
+                }],
+                depth_stencil_attachment: None,
+            });
+            self.skybox_pass.render(
+                &[&self.camera_uniforms.bind_group],
+                &asset_storage,
+                world,
+                &mut render_pass,
+            );
+        }
+
         self.model_pass
             .update_uniform_data(&world, &asset_storage, &self.device, &mut encoder);
         {
@@ -174,7 +216,7 @@ impl WgpuRenderer {
                 color_attachments: &[RenderPassColorAttachmentDescriptor {
                     attachment: &frame.view,
                     resolve_target: None,
-                    load_op: LoadOp::Clear,
+                    load_op: LoadOp::Load,
                     store_op: StoreOp::Store,
                     clear_color: Color {
                         r: 0.1,
