@@ -108,7 +108,7 @@ pub struct Model {
 }
 
 impl Model {
-    // TODO: Create a trait for this?
+    // TODO: Should this instead be in the texture struct?
     pub fn get_or_create_texture_layout(device: &Device) -> &'static BindGroupLayout {
         static LAYOUT: OnceCell<BindGroupLayout> = OnceCell::new();
         LAYOUT.get_or_init(|| {
@@ -145,7 +145,7 @@ impl Model {
                         ty: BindingType::Sampler { comparison: true },
                     },
                 ],
-                label: Some("Texture layout"),
+                label: Some("Model Texture layout"),
             })
         })
     }
