@@ -24,12 +24,29 @@ layout(set = 0, binding = 2) uniform texture2D t_specular;
 layout(set = 0, binding = 3) uniform sampler s_specular;
 
 
+layout(set = 3, binding = 0) uniform texture2DArray t_shadow;
+layout(set = 3, binding = 1) uniform samplerShadow s_shadow;
 
 const int MAX_POINT_LIGHTS = 16;
 layout(set=2, binding=0) uniform PointLights {
     int lights_used;
     PointLight pointLights[MAX_POINT_LIGHTS];
 };
+
+
+float fetch_shadow(int light_id, vec4 homo_coords) {
+    if (homo_coords.w <= 0.0) {
+        return 1.0;
+    }
+    const vec2 flip_correction = vec2(0.5, -0.5);
+    vec4 light_local = vec4(
+        homo_coords.xy * flip_correction/homo_coords.w + 0.5,
+        light_id,
+        homo_coords.z / homo_coords.w
+    );
+
+    return texture(sampler2DArrayShadow(t_shadow, s_shadow), light_local);
+}
 
 
 float calculate_attenuation(vec3 light_position, float constant, float linear, float quadratic) {
@@ -68,7 +85,8 @@ void main() {
     vec3 norm = normalize(normal);
     vec3 result = vec3(0.0);
     for(int i = 0; i < lights_used; i++) {
-        result += calculate_point_light(pointLights[i], norm);
+        float shadow_value = fetch_shadow(i, pointLights[i].projection * vec4(fragment_position, 0.0));
+        result += shadow_value * calculate_point_light(pointLights[i], norm);
     }
     //vec3 result = calculate_point_light(pointLights[0], norm);
     //f_color = vec4(vec3(1.0,0.09,0.032), 1.0);//vec4(result, 1.0);//+ texture(sampler2D(t_specular,s_specular), v_tex_coords);
