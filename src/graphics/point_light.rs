@@ -1,7 +1,7 @@
-use nalgebra::Vector3;
+use nalgebra::{Matrix4, Perspective3, Point3, Vector3};
 use zerocopy::AsBytes;
 
-#[derive(Copy, Clone, Debug)]
+#[derive(Debug)]
 pub struct PointLight {
     pub ambient: Vector3<f32>,
     pub specular: Vector3<f32>,
@@ -9,6 +9,8 @@ pub struct PointLight {
     pub constant: f32,
     pub linear: f32,
     pub quadratic: f32,
+    pub projection: Perspective3<f32>,
+    pub target_view: Option<wgpu::TextureView>,
 }
 
 #[repr(C)]
@@ -26,10 +28,23 @@ pub struct PointLightRaw {
     quadratic: f32,
     _pad3: f32,
     _pad4: f32,
+    pub projection: [[f32; 4]; 4], //todo are these really necessary if you don't use as bytes anyways?
 }
 
-impl From<(PointLight, Vector3<f32>)> for PointLightRaw {
-    fn from((light, position): (PointLight, Vector3<f32>)) -> Self {
+impl From<(&PointLight, Vector3<f32>)> for PointLightRaw {
+    fn from((light, position): (&PointLight, Vector3<f32>)) -> Self {
+        let view = Matrix4::look_at_rh(
+            &Point3::new(position.x, position.y, position.z),
+            &Point3::new(0.0, 0.0, 0.0),
+            &Vector3::z(), // can it be this that fucked it up previously???
+        );
+        let view_proj = light.projection.to_homogeneous() * view;
+        let projection = view_proj
+            .as_slice()
+            .chunks(4)
+            .map(|chunk| [chunk[0], chunk[1], chunk[2], chunk[3]])
+            .collect::<Vec<[f32; 4]>>();
+
         PointLightRaw {
             position: [position.x, position.y, position.z],
             ambient: [light.ambient.x, light.ambient.y, light.ambient.z],
@@ -38,6 +53,7 @@ impl From<(PointLight, Vector3<f32>)> for PointLightRaw {
             constant: light.constant,
             linear: light.linear,
             quadratic: light.quadratic,
+            projection: [projection[0], projection[1], projection[2], projection[3]],
             _pad: 0.0,
             _pad1: 0.0,
             _pad2: 0.0,
@@ -53,6 +69,7 @@ impl Default for PointLight {
         let linear = 0.09;
         let quadratic = 0.032;
 
+        let projection = Perspective3::new(1.0, 60.0, 1.0, 20.0);
         PointLight {
             ambient: Vector3::new(0.01, 0.01, 0.01),
             specular: Vector3::new(1.0, 1.0, 1.0),
@@ -60,6 +77,8 @@ impl Default for PointLight {
             constant,
             linear,
             quadratic,
+            projection,
+            target_view: None,
         }
     }
 }

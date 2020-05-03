@@ -4,6 +4,7 @@ pub mod model;
 pub mod pass;
 pub mod point_light;
 pub mod shader;
+pub mod shadow_texture;
 pub mod skybox_texture;
 pub mod texture;
 pub mod wgpu_renderer;

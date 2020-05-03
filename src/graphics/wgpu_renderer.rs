@@ -1,5 +1,5 @@
 use glfw::Window;
-use legion::prelude::{Resources, World};
+use legion::prelude::*;
 use wgpu::{
     Adapter, BackendBit, Color, CommandEncoder, CommandEncoderDescriptor, Device, DeviceDescriptor,
     Extensions, Extent3d, LoadOp, PowerPreference, PresentMode, Queue,
@@ -8,14 +8,25 @@ use wgpu::{
     SwapChainDescriptor, Texture, TextureDimension, TextureFormat, TextureUsage, TextureView,
 };
 
-use super::{pass::skybox_pass::SkyboxPass, skybox_texture::SkyboxTexture};
+use super::{
+    pass::{shadow_pass::ShadowPass, skybox_pass::SkyboxPass},
+    point_light::PointLightRaw,
+    skybox_texture::SkyboxTexture,
+    uniform_bind_groups::{LightProjection, LightUniforms},
+    PointLight,
+};
 use crate::assets::AssetManager;
 use crate::camera::Camera;
 use crate::graphics::model::Model;
 use crate::graphics::pass::light_object_pass::LightObjectPass;
 use crate::graphics::pass::model_pass::ModelPass;
+use crate::graphics::shadow_texture::ShadowTexture;
 use crate::graphics::uniform_bind_groups::CameraDataRaw;
-use crate::graphics::{Pass, UniformBindGroup, UniformCameraData};
+use crate::{
+    components::Transform,
+    graphics::{Pass, UniformBindGroup, UniformCameraData},
+};
+use nalgebra::Vector3;
 
 //type RenderPass = Box<dyn Pass>;
 
@@ -50,11 +61,13 @@ pub struct WgpuRenderer {
     width: u32,
     height: u32,
     camera_uniforms: UniformBindGroup<CameraDataRaw>,
+    light_uniforms: UniformBindGroup<LightUniforms>,
     depth_texture: Texture,
     depth_texture_view: TextureView,
     model_pass: ModelPass,
     light_pass: LightObjectPass,
     skybox_pass: SkyboxPass,
+    shadow_pass: ShadowPass,
 }
 
 impl WgpuRenderer {
@@ -92,15 +105,27 @@ impl WgpuRenderer {
         let swap_chain = device.create_swap_chain(&surface, &swap_chain_desc);
 
         let camera_uniforms = UniformBindGroup::new(&device, ShaderStage::VERTEX);
+        let light_uniforms = UniformBindGroup::new(&device, ShaderStage::FRAGMENT);
 
         let depth_texture = create_depth_texture(&device, &swap_chain_desc);
         let depth_texture_view = depth_texture.create_default_view();
+
+        let shadow_pass = ShadowPass::new(
+            &device,
+            vec![
+                Model::get_or_create_texture_layout(&device),
+                &camera_uniforms.bind_group_layout,
+            ],
+        )
+        .unwrap();
 
         let model_pass = ModelPass::new(
             &device,
             vec![
                 Model::get_or_create_texture_layout(&device),
                 &camera_uniforms.bind_group_layout,
+                &light_uniforms.bind_group_layout,
+                ShadowTexture::get_or_create_texture_layout(&device),
             ],
             swap_chain_desc.format,
         )
@@ -140,6 +165,8 @@ impl WgpuRenderer {
             light_pass,
             skybox_pass,
             camera_uniforms,
+            light_uniforms,
+            shadow_pass,
         }
     }
 
@@ -171,8 +198,36 @@ impl WgpuRenderer {
         )
     }
 
+    pub fn update_lights(&self, world: &World, encoder: &mut CommandEncoder) {
+        let query = <(Read<PointLight>, Read<Transform>)>::query();
+        for chunk in query.par_iter_chunks(world) {
+            let lights = chunk.components::<PointLight>().unwrap();
+            let positions = chunk.components::<Transform>().unwrap();
+            let mut uniform_data =
+                [PointLightRaw::from((&PointLight::default(), Vector3::new(0.0, 0.0, 0.0))); 16];
+            let mut lights_used = 0;
+            lights
+                .iter()
+                .zip(positions.iter())
+                .enumerate()
+                .for_each(|(i, (light, pos))| {
+                    uniform_data[i] = PointLightRaw::from((light, pos.translation()));
+                    lights_used += 1;
+                });
+            self.light_uniforms.update(
+                &self.device,
+                &LightUniforms {
+                    lights_used,
+                    pad: [0; 3],
+                    point_lights: uniform_data,
+                },
+                encoder,
+            );
+        }
+    }
+
     // THIS SHOULD NOT REQUIRE MUTABLE REF TO RESOURCES!
-    pub fn render_frame(&mut self, world: &World, resources: &mut Resources) {
+    pub fn render_frame(&mut self, world: &mut World, resources: &mut Resources) {
         let frame = self.swap_chain.get_next_texture().unwrap();
         let camera = resources.get::<Camera>().unwrap();
         let mut encoder = self
@@ -181,10 +236,30 @@ impl WgpuRenderer {
                 label: Some("Model render pass"),
             });
         self.update_camera_uniforms(&camera, &mut encoder);
+        self.update_lights(world, &mut encoder);
         let mut asset_storage = resources.get_mut::<AssetManager>().unwrap();
         // TODO: This should be in an update method instead
         let mut commands = asset_storage.clear_load_queue(&self.device);
-
+        self.model_pass
+            .update_uniform_data(&world, &asset_storage, &self.device, &mut encoder);
+        // move somewhere else this isn't as nice
+        self.shadow_pass
+            .shadow_texture
+            .update_lights_with_texture_view(&self.device, world);
+        let query = <(Read<PointLight>, Read<Transform>)>::query();
+        for (light, transform) in query.iter(world) {
+            let raw_light = PointLightRaw::from((&*light, transform.translation()));
+            self.shadow_pass
+                .update_uniforms(&self.device, &raw_light, &mut encoder);
+            self.shadow_pass.render(
+                // This shit doesn't work for some reaso
+                &mut encoder,
+                &[&self.camera_uniforms.bind_group],
+                &light,
+                world,
+                &asset_storage,
+            );
+        }
         {
             let mut render_pass = encoder.begin_render_pass(&RenderPassDescriptor {
                 color_attachments: &[RenderPassColorAttachmentDescriptor {
@@ -209,8 +284,6 @@ impl WgpuRenderer {
             );
         }
 
-        self.model_pass
-            .update_uniform_data(&world, &asset_storage, &self.device, &mut encoder);
         {
             let mut render_pass = encoder.begin_render_pass(&RenderPassDescriptor {
                 color_attachments: &[RenderPassColorAttachmentDescriptor {
@@ -236,7 +309,11 @@ impl WgpuRenderer {
                 }),
             });
             self.model_pass.render(
-                &[&self.camera_uniforms.bind_group],
+                &[
+                    &self.camera_uniforms.bind_group,
+                    &self.light_uniforms.bind_group,
+                    &self.shadow_pass.shadow_texture.bind_group,
+                ],
                 &asset_storage,
                 world,
                 &mut render_pass,

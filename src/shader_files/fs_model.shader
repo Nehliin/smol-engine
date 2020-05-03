@@ -15,6 +15,7 @@ struct PointLight {
     float constant;
     float linear;
     float quadratic;
+    mat4 projection; // used for shadowmapping
 };
 // handle multiple textures?
 layout(set = 0, binding = 0) uniform texture2D t_diffuse;

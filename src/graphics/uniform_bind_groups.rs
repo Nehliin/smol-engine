@@ -1,3 +1,4 @@
+use super::PointLight;
 use crate::graphics::point_light::PointLightRaw;
 use nalgebra::{Matrix4, Vector3};
 use std::marker::PhantomData;
@@ -66,6 +67,20 @@ pub struct LightUniforms {
     pub lights_used: i32,
     pub pad: [i32; 3],
     pub(crate) point_lights: [PointLightRaw; 16],
+}
+
+#[repr(C)]
+#[derive(Debug, AsBytes, Default)]
+pub struct LightProjection {
+    pub projection: [[f32; 4]; 4],
+}
+
+impl From<&PointLightRaw> for LightProjection {
+    fn from(light: &PointLightRaw) -> Self {
+        Self {
+            projection: light.projection,
+        }
+    }
 }
 
 pub struct UniformBindGroup<T> {

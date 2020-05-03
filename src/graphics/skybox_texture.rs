@@ -4,11 +4,11 @@ use once_cell::sync::OnceCell;
 use std::path::Path;
 use wgpu::{
     AddressMode, BindGroup, BindGroupDescriptor, BindGroupLayout, BindGroupLayoutDescriptor,
-    BindGroupLayoutEntry, Binding, BindingResource, BindingType, Buffer, BufferCopyView,
-    BufferUsage, CommandBuffer, CommandEncoderDescriptor, CompareFunction, Device, Extent3d,
-    FilterMode, Origin3d, Sampler, ShaderStage, TextureAspect, TextureComponentType,
-    TextureCopyView, TextureDescriptor, TextureDimension, TextureFormat, TextureView,
-    TextureViewDescriptor, TextureViewDimension,
+    BindGroupLayoutEntry, Binding, BindingResource, BindingType, BufferCopyView, BufferUsage,
+    CommandBuffer, CommandEncoderDescriptor, CompareFunction, Device, Extent3d, FilterMode,
+    Origin3d, Sampler, ShaderStage, TextureAspect, TextureComponentType, TextureCopyView,
+    TextureDescriptor, TextureDimension, TextureFormat, TextureView, TextureViewDescriptor,
+    TextureViewDimension,
 };
 
 const REQUIRED_SKYBOX_TEXTURES: usize = 6;

@@ -5,8 +5,6 @@ use crate::{
     graphics::model::MeshVertex,
     graphics::model::{DrawModel, InstanceData},
     graphics::pass::VBDesc,
-    graphics::point_light::PointLightRaw,
-    graphics::uniform_bind_groups::LightUniforms,
     graphics::wgpu_renderer::DEPTH_FORMAT,
     graphics::{PointLight, Shader, UniformBindGroup},
 };
@@ -24,7 +22,6 @@ use wgpu::{
 
 pub struct ModelPass {
     render_pipeline: RenderPipeline,
-    light_uniforms: UniformBindGroup<LightUniforms>,
 }
 
 impl ModelPass {
@@ -44,12 +41,8 @@ impl ModelPass {
             ShaderType::Fragment,
         )?;
 
-        let light_uniforms = UniformBindGroup::new(device, ShaderStage::FRAGMENT);
-        let mut bind_group_layouts = incoming_layouts;
-        bind_group_layouts.push(&light_uniforms.bind_group_layout);
-
         let render_pipeline_layout = device.create_pipeline_layout(&PipelineLayoutDescriptor {
-            bind_group_layouts: &bind_group_layouts,
+            bind_group_layouts: &incoming_layouts,
         });
 
         let render_pipeline = device.create_render_pipeline(&RenderPipelineDescriptor {
@@ -88,38 +81,7 @@ impl ModelPass {
             alpha_to_coverage_enabled: false,
         });
 
-        Ok(Self {
-            render_pipeline,
-            light_uniforms,
-        })
-    }
-    // TODO: fett hacky
-    pub fn update_lights(&self, world: &World, device: &Device, encoder: &mut CommandEncoder) {
-        let query = <(Read<PointLight>, Read<Transform>)>::query();
-        for chunk in query.par_iter_chunks(world) {
-            let lights = chunk.components::<PointLight>().unwrap();
-            let positions = chunk.components::<Transform>().unwrap();
-            let mut uniform_data =
-                [PointLightRaw::from((PointLight::default(), Vector3::new(0.0, 0.0, 0.0))); 16];
-            let mut lights_used = 0;
-            lights
-                .iter()
-                .zip(positions.iter())
-                .enumerate()
-                .for_each(|(i, (light, pos))| {
-                    uniform_data[i] = PointLightRaw::from((*light, pos.translation()));
-                    lights_used += 1;
-                });
-            self.light_uniforms.update(
-                device,
-                &LightUniforms {
-                    lights_used,
-                    pad: [0; 3],
-                    point_lights: uniform_data,
-                },
-                encoder,
-            );
-        }
+        Ok(Self { render_pipeline })
     }
 }
 
@@ -131,7 +93,6 @@ impl Pass for ModelPass {
         device: &Device,
         encoder: &mut CommandEncoder,
     ) {
-        self.update_lights(world, device, encoder);
         let mut offsets = HashMap::new();
         let query = <(Read<Transform>, Tagged<ModelHandle>)>::query();
         for chunk in query.par_iter_chunks(world) {
@@ -166,8 +127,13 @@ impl Pass for ModelPass {
         render_pass: &mut RenderPass<'encoder>,
     ) {
         render_pass.set_pipeline(&self.render_pipeline);
+        // Bindgroup 0 is for the model textures set in the drawcall
+        // 1 = camera uniforms
         render_pass.set_bind_group(1, global_bind_groups[0], &[]);
-        render_pass.set_bind_group(2, &self.light_uniforms.bind_group, &[]);
+        // 2 = light uniforms
+        render_pass.set_bind_group(2, global_bind_groups[1], &[]);
+        // 3 = shadow texture uniforms
+        render_pass.set_bind_group(3, global_bind_groups[2], &[]);
         let mut offset_map = HashMap::new();
         let query =
             <(Read<Transform>, Tagged<ModelHandle>)>::query().filter(!component::<PointLight>());

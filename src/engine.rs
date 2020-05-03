@@ -56,7 +56,7 @@ impl Engine<WgpuRenderer> {
         window.set_key_polling(true);
         window.set_cursor_pos_polling(true);
         window.set_mouse_button_polling(true);
-        window.set_cursor_mode(glfw::CursorMode::Disabled);
+        //window.set_cursor_mode(glfw::CursorMode::Disabled);
         window.set_framebuffer_size_polling(true);
 
         // ECS initialization
@@ -111,7 +111,8 @@ impl Engine<WgpuRenderer> {
             self.process_events();
             self.current_state
                 .update(&mut self.world, &mut self.resources);
-            self.renderer.render_frame(&self.world, &mut self.resources);
+            self.renderer
+                .render_frame(&mut self.world, &mut self.resources);
             self.glfw.poll_events();
         }
     }
