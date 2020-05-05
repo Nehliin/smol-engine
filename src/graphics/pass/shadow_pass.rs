@@ -6,7 +6,7 @@ use crate::{
         model::{DrawModel, InstanceData, MeshVertex},
         point_light::PointLightRaw,
         shadow_texture::{ShadowTexture, SHADOW_FORMAT},
-        uniform_bind_groups::LightProjection,
+        uniform_bind_groups::LightSpaceMatrix,
         PointLight, Shader, UniformBindGroup,
     },
 };
@@ -23,7 +23,7 @@ use wgpu::{BindGroup, BindGroupLayout, CommandBuffer, Device};
 // Update the resize method
 pub struct ShadowPass {
     render_pipeline: wgpu::RenderPipeline,
-    light_projection_uniforms: UniformBindGroup<LightProjection>,
+    light_projection_uniforms: UniformBindGroup<LightSpaceMatrix>,
     pub shadow_texture: ShadowTexture,
 }
 

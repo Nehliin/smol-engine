@@ -40,7 +40,7 @@ impl State for BasicState {
         let mut asset_manager = resources.get_mut::<AssetManager>().unwrap();
         let suit_handle = asset_manager.load_model("nanosuit/nanosuit.obj").unwrap();
         let cube_handle = asset_manager.load_model("box/cube.obj").unwrap();
-        let sphere_handle = asset_manager.load_model("light/light_cube.obj").unwrap();
+        let light_box_handle = asset_manager.load_model("light/light_cube.obj").unwrap();
         /*let physicis = Physics::new(resources);
         let schedule = Schedule::builder().add_system(physicis.system).build();
 
@@ -129,13 +129,13 @@ impl State for BasicState {
             )],
         );*/
         let light_positions = vec![
-           // Vector3::new(0.0, 5.0, 3.0),
+        //    Vector3::new(0.0, 5.0, 3.0),
             Vector3::new(2.0, 4.3, -3.0),
-            //Vector3::new(1.0, 1.0, 0.0),
-            //Vector3::new(0.0, 0.0, -3.0),
+          //  Vector3::new(1.0, 1.0, 0.0),
+           // Vector3::new(0.0, 0.0, -3.0),
         ];
         world.insert(
-            (sphere_handle, ()),
+            (light_box_handle, ()),
             light_positions.iter().map(|&position| {
                 (
                     Transform::new(
@@ -143,7 +143,7 @@ impl State for BasicState {
                         Vector3::new(0.5, 0.5, 0.5),
                     ),
                     PointLight {
-                        diffuse: Vector3::new(1.0, 0.5, 0.3),
+                        diffuse: Vector3::new(1.0, 1.0, 1.0),
                         ..PointLight::default()
                     },
                 )

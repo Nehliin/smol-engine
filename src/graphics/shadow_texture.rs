@@ -62,7 +62,7 @@ impl ShadowTexture {
         }
     }
 
-    pub fn update_lights_with_texture_view(&self, device: &Device, world: &mut World) {
+    pub fn update_lights_with_texture_view(&self, world: &mut World) {
         let light_query = <Write<PointLight>>::query();
         for (i, mut light) in light_query.iter_mut(world).enumerate() {
             if light.target_view.is_some() {
@@ -71,7 +71,7 @@ impl ShadowTexture {
             light.target_view = Some(self.texture.create_view(&wgpu::TextureViewDescriptor {
                 format: SHADOW_FORMAT,
                 dimension: wgpu::TextureViewDimension::D2,
-                aspect: wgpu::TextureAspect::All, //do depth only work?
+                aspect: wgpu::TextureAspect::DepthOnly,
                 base_mip_level: 0,
                 level_count: 1,
                 base_array_layer: i as u32,

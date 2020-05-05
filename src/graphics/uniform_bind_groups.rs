@@ -71,14 +71,14 @@ pub struct LightUniforms {
 
 #[repr(C)]
 #[derive(Debug, AsBytes, Default)]
-pub struct LightProjection {
-    pub projection: [[f32; 4]; 4],
+pub struct LightSpaceMatrix {
+    pub light_space_matrix: [[f32; 4]; 4],
 }
 
-impl From<&PointLightRaw> for LightProjection {
+impl From<&PointLightRaw> for LightSpaceMatrix {
     fn from(light: &PointLightRaw) -> Self {
         Self {
-            projection: light.projection,
+            light_space_matrix: light.light_space_matrix,
         }
     }
 }

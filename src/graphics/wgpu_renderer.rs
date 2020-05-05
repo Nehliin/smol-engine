@@ -12,7 +12,7 @@ use super::{
     pass::{shadow_pass::ShadowPass, skybox_pass::SkyboxPass},
     point_light::PointLightRaw,
     skybox_texture::SkyboxTexture,
-    uniform_bind_groups::{LightProjection, LightUniforms},
+    uniform_bind_groups::{LightSpaceMatrix, LightUniforms},
     PointLight,
 };
 use crate::assets::AssetManager;
@@ -245,7 +245,7 @@ impl WgpuRenderer {
         // move somewhere else this isn't as nice
         self.shadow_pass
             .shadow_texture
-            .update_lights_with_texture_view(&self.device, world);
+            .update_lights_with_texture_view(world);
         let query = <(Read<PointLight>, Read<Transform>)>::query();
         for (light, transform) in query.iter(world) {
             let raw_light = PointLightRaw::from((&*light, transform.translation()));

@@ -15,7 +15,7 @@ struct PointLight {
     float constant;
     float linear;
     float quadratic;
-    mat4 projection; // used for shadowmapping
+    mat4 light_space_matrix; // used for shadowmapping
 };
 // handle multiple textures?
 layout(set = 0, binding = 0) uniform texture2D t_diffuse;
@@ -34,7 +34,7 @@ layout(set=2, binding=0) uniform PointLights {
 };
 
 
-float fetch_shadow(int light_id, vec4 homo_coords) {
+float calc_shadow(int light_id, vec4 homo_coords) {
     vec3 projCoords = homo_coords.xyz / homo_coords.w;
     if (projCoords.z > 1.0) {
         return 0.0;
@@ -90,12 +90,9 @@ void main() {
     vec3 result = vec3(0.0);
    
     for(int i = 0; i < lights_used; i++) {
-        vec4 light_space_pos = CONVERSION * pointLights[i].projection * vec4(fragment_position, 1.0);
-        float shadow_value = fetch_shadow(i, light_space_pos);
+        vec4 light_space_pos = CONVERSION * pointLights[i].light_space_matrix * vec4(fragment_position, 1.0);
+        float shadow_value = calc_shadow(i, light_space_pos);
         result += calculate_point_light(pointLights[i], norm, shadow_value);
     }
-    //vec3 result = calculate_point_light(pointLights[0], norm);
-    //f_color = vec4(vec3(1.0,0.09,0.032), 1.0);//vec4(result, 1.0);//+ texture(sampler2D(t_specular,s_specular), v_tex_coords);
-     f_color = vec4(result ,1.0);
-    //f_color = vec4(vec3(pointLights.constant, pointLights.linear, pointLights.quadratic), 1.0);
+    f_color = vec4(result ,1.0);
 }
