@@ -1,4 +1,4 @@
-use nalgebra::{Matrix4, Perspective3, Point3, Vector3};
+use nalgebra::{Matrix4, Orthographic3, Perspective3, Point3, Vector3};
 use zerocopy::AsBytes;
 
 #[derive(Debug)]
@@ -9,7 +9,7 @@ pub struct PointLight {
     pub constant: f32,
     pub linear: f32,
     pub quadratic: f32,
-    pub projection: Perspective3<f32>,
+    pub projection: Orthographic3<f32>,
     pub target_view: Option<wgpu::TextureView>,
 }
 
@@ -36,10 +36,11 @@ impl From<(&PointLight, Vector3<f32>)> for PointLightRaw {
         let view = Matrix4::look_at_rh(
             &Point3::new(position.x, position.y, position.z),
             &Point3::new(0.0, 0.0, 0.0),
-            &Vector3::z(), // can it be this that fucked it up previously???
+            &Vector3::y(), // can it be this that fucked it up previously???
         );
-        let view_proj = light.projection.to_homogeneous() * view;
-        let projection = view_proj
+        let light_space_matrix = light.projection.to_homogeneous() * view;
+        // dbg!(&view_proj);
+        let projection = light_space_matrix
             .as_slice()
             .chunks(4)
             .map(|chunk| [chunk[0], chunk[1], chunk[2], chunk[3]])
@@ -69,7 +70,7 @@ impl Default for PointLight {
         let linear = 0.09;
         let quadratic = 0.032;
 
-        let projection = Perspective3::new(1.0, 60.0, 1.0, 20.0);
+        let projection = Orthographic3::new(-10.0, 10.0, -10.0, 10.0, 1.0, 100.0);
         PointLight {
             ambient: Vector3::new(0.01, 0.01, 0.01),
             specular: Vector3::new(1.0, 1.0, 1.0),

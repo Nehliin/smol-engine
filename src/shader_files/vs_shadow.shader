@@ -26,5 +26,5 @@ const mat4 CONVERSION = mat4(
 0.0, 0.0, 0.5, 1.0);
 
 void main() {
-    gl_Position = CONVERSION * light_projection * view * vec4(a_position, 1.0);
+    gl_Position = CONVERSION * light_projection *  model * vec4(a_position, 1.0);
 }

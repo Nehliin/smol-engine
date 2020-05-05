@@ -129,10 +129,10 @@ impl State for BasicState {
             )],
         );*/
         let light_positions = vec![
-            Vector3::new(0.7, 0.2, 2.0),
-            Vector3::new(2.3, -3.3, -4.0),
-            Vector3::new(-4.0, 2.0, -12.0),
-            Vector3::new(0.0, 0.0, -3.0),
+           // Vector3::new(0.0, 5.0, 3.0),
+            Vector3::new(2.0, 4.3, -3.0),
+            //Vector3::new(1.0, 1.0, 0.0),
+            //Vector3::new(0.0, 0.0, -3.0),
         ];
         world.insert(
             (sphere_handle, ()),
@@ -151,10 +151,10 @@ impl State for BasicState {
         );
         let mut components = Vec::new();
 
-        for x in 0..10 {
-            for y in 0..10 {
+        for x in 0..1 {
+            for y in 0..1 {
                 components.push((Transform::new(
-                    Isometry3::translation(x as f32, -1.75, y as f32),
+                    Isometry3::translation((x + 2) as f32, -1.75, y as f32),
                     Vector3::new(0.2, 0.2, 0.2),
                 ),));
             }

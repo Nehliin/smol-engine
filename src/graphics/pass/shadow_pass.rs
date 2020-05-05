@@ -57,9 +57,9 @@ impl ShadowPass {
             fragment_stage: Some(fs_shader.get_descriptor()),
             rasterization_state: Some(wgpu::RasterizationStateDescriptor {
                 front_face: wgpu::FrontFace::Ccw,
-                cull_mode: wgpu::CullMode::Back,
-                depth_bias: 2,               // Biliniear filtering
-                depth_bias_slope_scale: 2.0, //TODO modify this and see what happens
+                cull_mode: wgpu::CullMode::Front,
+                depth_bias: 0,               // Biliniear filtering
+                depth_bias_slope_scale: 2.0,
                 depth_bias_clamp: 0.0,
             }),
             primitive_topology: wgpu::PrimitiveTopology::TriangleList,
