@@ -3,7 +3,7 @@ use crate::components::Transform;
 use crate::graphics::model::{DrawModel, InstanceData, MeshVertex};
 use crate::graphics::pass::VBDesc;
 use crate::graphics::wgpu_renderer::DEPTH_FORMAT;
-use crate::graphics::{Pass, PointLight, Shader};
+use crate::graphics::{Pass, lighting::PointLight, Shader};
 use glsl_to_spirv::ShaderType;
 use legion::prelude::*;
 use wgpu::{

@@ -1,3 +1,4 @@
+use super::Light;
 use nalgebra::{Matrix4, Orthographic3, Point3, Vector3};
 use once_cell::sync::Lazy;
 use zerocopy::AsBytes;
@@ -14,6 +15,12 @@ pub struct PointLight {
     pub linear: f32,
     pub quadratic: f32,
     pub target_view: Option<wgpu::TextureView>,
+}
+
+impl Light for PointLight {
+    fn get_target_view(&self) -> &Option<wgpu::TextureView> {
+        &self.target_view
+    }
 }
 
 #[repr(C)]

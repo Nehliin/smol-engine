@@ -1,5 +1,5 @@
-use super::PointLight;
-use crate::graphics::point_light::PointLightRaw;
+use super::lighting::{directional_light::DirectionalLightRaw, PointLight};
+use crate::graphics::lighting::point_light::PointLightRaw;
 use nalgebra::{Matrix4, Vector3};
 use std::marker::PhantomData;
 use wgpu::{
@@ -63,10 +63,16 @@ impl Default for UniformCameraData {
 
 #[repr(C)]
 #[derive(Default, Debug, AsBytes)]
-pub struct LightUniforms {
+pub struct PointLightUniforms {
     pub lights_used: i32,
     pub pad: [i32; 3],
     pub(crate) point_lights: [PointLightRaw; 16],
+}
+
+#[repr(C)]
+#[derive(Debug, Default, AsBytes)]
+pub struct DirectionalLightUniforms {
+    pub directional_light: DirectionalLightRaw,
 }
 
 #[repr(C)]
@@ -79,6 +85,14 @@ impl From<&PointLightRaw> for LightSpaceMatrix {
     fn from(light: &PointLightRaw) -> Self {
         Self {
             light_space_matrix: light.light_space_matrix,
+        }
+    }
+}
+
+impl From<&DirectionalLightRaw> for LightSpaceMatrix {
+    fn from(light: &DirectionalLightRaw) -> Self {
+        Self {
+            light_space_matrix: light.light_space_matrix
         }
     }
 }

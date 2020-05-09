@@ -1,13 +1,15 @@
+use crate::graphics::lighting::Light;
 use super::{Pass, VBDesc};
 use crate::{
     assets::{AssetManager, ModelHandle},
     components::Transform,
     graphics::{
+        lighting::point_light::PointLightRaw,
+        lighting::PointLight,
         model::{DrawModel, InstanceData, MeshVertex},
-        point_light::PointLightRaw,
         shadow_texture::{ShadowTexture, SHADOW_FORMAT},
         uniform_bind_groups::LightSpaceMatrix,
-        PointLight, Shader, UniformBindGroup,
+        Shader, UniformBindGroup,
     },
 };
 use anyhow::Result;
@@ -58,7 +60,7 @@ impl ShadowPass {
             rasterization_state: Some(wgpu::RasterizationStateDescriptor {
                 front_face: wgpu::FrontFace::Ccw,
                 cull_mode: wgpu::CullMode::Front,
-                depth_bias: 0,               // Biliniear filtering
+                depth_bias: 0, // Biliniear filtering
                 depth_bias_slope_scale: 2.0,
                 depth_bias_clamp: 0.0,
             }),
@@ -89,28 +91,31 @@ impl ShadowPass {
         })
     }
 
-    pub fn update_uniforms(
+    pub fn update_uniforms<'a, T>(
         &self,
         device: &Device,
-        light: &PointLightRaw,
+        light: &'a T,
         encoder: &mut wgpu::CommandEncoder,
-    ) {
+    ) where
+        &'a T: Into<LightSpaceMatrix>,
+    {
+        let matrix = light.into();
         self.light_projection_uniforms
-            .update(device, &light.into(), encoder);
+            .update(device, &matrix, encoder);
     }
 
-    pub fn render(
+    pub fn render<T: Light>(
         &self,
         encoder: &mut wgpu::CommandEncoder,
         global_bindgroups: &[&wgpu::BindGroup],
-        light: &PointLight,
+        light: &T,
         world: &World,
         asset_manager: &AssetManager,
     ) {
         let mut pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
             color_attachments: &[],
             depth_stencil_attachment: Some(wgpu::RenderPassDepthStencilAttachmentDescriptor {
-                attachment: light.target_view.as_ref().unwrap(),
+                attachment: light.get_target_view().as_ref().unwrap(),
                 depth_load_op: wgpu::LoadOp::Clear,
                 depth_store_op: wgpu::StoreOp::Store,
                 clear_depth: 1.0,
@@ -122,10 +127,8 @@ impl ShadowPass {
 
         pass.set_pipeline(&self.render_pipeline);
         // 0 = model texture bindgroup set in the draw call
-        // 1 = camera bindgroup
-        pass.set_bind_group(1, global_bindgroups[0], &[]);
-        // 2 = light projections
-        pass.set_bind_group(2, &self.light_projection_uniforms.bind_group, &[]);
+        // 1 = light projections
+        pass.set_bind_group(1, &self.light_projection_uniforms.bind_group, &[]);
 
         let mut offset_map = HashMap::new();
         let query =

@@ -33,6 +33,18 @@ layout(set=2, binding=0) uniform PointLights {
     PointLight pointLights[MAX_POINT_LIGHTS];
 };
 
+struct DirectionalLight {
+    vec3 ambient;
+    vec3 specular;
+    vec3 diffuse;
+    vec3 direction;
+    mat4 light_space_matrix;
+};
+
+layout(set=4, binding=0) uniform DirectionalLights {
+    DirectionalLight directionalLight;
+};
+
 
 float calc_shadow(int light_id, vec4 homo_coords) {
     vec3 projCoords = homo_coords.xyz / homo_coords.w;
@@ -51,6 +63,26 @@ float calculate_attenuation(vec3 light_position, float constant, float linear, f
     return 1.0 / (constant + (linear * distance) + quadratic * (distance * distance));
 }
 
+
+vec3 calculate_directional_light(DirectionalLight light, vec3 normal, float shadow_value) {
+    vec3 result = vec3(0.0);
+    vec3 direction_to_light = normalize(-light.direction);
+
+    vec3 viewDir = normalize(view_pos - fragment_position);
+    vec3 halfwayDir = normalize(direction_to_light + viewDir);
+
+    float spec = pow(max(dot(normal, halfwayDir), 0.0), 32.0);
+    float diff = max(dot(normal, direction_to_light), 0.0);
+
+    result += (1.0 - shadow_value) * light.specular *  spec * texture(sampler2D(t_specular, s_specular), v_tex_coords).rgb;
+
+    result += (1.0 - shadow_value) * light.diffuse * diff * texture(sampler2D(t_diffuse, s_diffuse), v_tex_coords).rgb;
+
+    result += light.ambient * texture(sampler2D(t_diffuse, s_diffuse), v_tex_coords).rgb;
+
+    return result;
+
+}
 
 vec3 calculate_point_light(PointLight light, vec3 normal, float shadow_value) {
 
@@ -87,12 +119,13 @@ const mat4 CONVERSION = mat4(
 void main() {
 
     vec3 norm = normalize(normal);
-    vec3 result = vec3(0.0);
+    float shadow_value = calc_shadow(0, CONVERSION * directionalLight.light_space_matrix * vec4(fragment_position, 1.0));
+    vec3 result = calculate_directional_light(directionalLight, norm, shadow_value);
    
-    for(int i = 0; i < lights_used; i++) {
+    /*for(int i = 0; i < lights_used; i++) {
         vec4 light_space_pos = CONVERSION * pointLights[i].light_space_matrix * vec4(fragment_position, 1.0);
         float shadow_value = calc_shadow(i, light_space_pos);
         result += calculate_point_light(pointLights[i], norm, shadow_value);
-    }
+    }*/
     f_color = vec4(result ,1.0);
 }

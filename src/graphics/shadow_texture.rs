@@ -1,4 +1,4 @@
-use super::PointLight;
+use super::lighting::{DirectionalLight, PointLight};
 use legion::prelude::*;
 use once_cell::sync::OnceCell;
 use wgpu::Device;
@@ -63,7 +63,7 @@ impl ShadowTexture {
     }
 
     pub fn update_lights_with_texture_view(&self, world: &mut World) {
-        let light_query = <Write<PointLight>>::query();
+        let light_query = <Write<DirectionalLight>>::query();
         for (i, mut light) in light_query.iter_mut(world).enumerate() {
             if light.target_view.is_some() {
                 continue;

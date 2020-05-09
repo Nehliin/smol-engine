@@ -12,7 +12,7 @@ use std::collections::HashMap;
 
 use super::State;
 use crate::assets::AssetManager;
-use crate::graphics::PointLight;
+use crate::graphics::lighting::{DirectionalLight, PointLight};
 
 pub struct BasicState {
     //  schedule: Option<Schedule>,
@@ -128,13 +128,13 @@ impl State for BasicState {
                 floor_transform,
             )],
         );*/
-        let light_positions = vec![
+        //let light_positions = vec![
         //    Vector3::new(0.0, 5.0, 3.0),
-            Vector3::new(2.0, 4.3, -3.0),
+          //  Vector3::new(2.0, 4.3, -3.0),
           //  Vector3::new(1.0, 1.0, 0.0),
            // Vector3::new(0.0, 0.0, -3.0),
-        ];
-        world.insert(
+        //];
+        /*world.insert(
             (light_box_handle, ()),
             light_positions.iter().map(|&position| {
                 (
@@ -148,7 +148,7 @@ impl State for BasicState {
                     },
                 )
             }),
-        );
+        );*/
         let mut components = Vec::new();
 
         for x in 0..1 {
@@ -159,7 +159,7 @@ impl State for BasicState {
                 ),));
             }
         }
-
+        world.insert((), vec![(DirectionalLight::default(),())]);
         world.insert(
             (suit_handle, ()), // selected
             components,

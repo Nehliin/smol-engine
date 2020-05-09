@@ -2,18 +2,20 @@ use glfw::Window;
 use legion::prelude::*;
 use wgpu::{
     Adapter, BackendBit, Color, CommandEncoder, CommandEncoderDescriptor, Device, DeviceDescriptor,
-    Extensions, Extent3d, LoadOp, PowerPreference, PresentMode, Queue,
+    Extensions, Extent3d, Limits, LoadOp, PowerPreference, PresentMode, Queue,
     RenderPassColorAttachmentDescriptor, RenderPassDepthStencilAttachmentDescriptor,
     RenderPassDescriptor, RequestAdapterOptions, ShaderStage, StoreOp, Surface, SwapChain,
     SwapChainDescriptor, Texture, TextureDimension, TextureFormat, TextureUsage, TextureView,
 };
 
 use super::{
+    lighting::PointLight,
+    lighting::{
+        directional_light::DirectionalLightRaw, point_light::PointLightRaw, DirectionalLight,
+    },
     pass::{shadow_pass::ShadowPass, skybox_pass::SkyboxPass},
-    point_light::PointLightRaw,
     skybox_texture::SkyboxTexture,
-    uniform_bind_groups::{LightSpaceMatrix, LightUniforms},
-    PointLight,
+    uniform_bind_groups::{DirectionalLightUniforms, LightSpaceMatrix, PointLightUniforms},
 };
 use crate::assets::AssetManager;
 use crate::camera::Camera;
@@ -61,7 +63,8 @@ pub struct WgpuRenderer {
     width: u32,
     height: u32,
     camera_uniforms: UniformBindGroup<CameraDataRaw>,
-    light_uniforms: UniformBindGroup<LightUniforms>,
+    point_light_uniforms: UniformBindGroup<PointLightUniforms>,
+    directional_light_uniforms: UniformBindGroup<DirectionalLightUniforms>,
     depth_texture: Texture,
     depth_texture_view: TextureView,
     model_pass: ModelPass,
@@ -90,7 +93,7 @@ impl WgpuRenderer {
                 extensions: Extensions {
                     anisotropic_filtering: false,
                 },
-                limits: Default::default(),
+                limits: Limits { max_bind_groups: 6 },
             })
             .await;
 
@@ -105,27 +108,22 @@ impl WgpuRenderer {
         let swap_chain = device.create_swap_chain(&surface, &swap_chain_desc);
 
         let camera_uniforms = UniformBindGroup::new(&device, ShaderStage::VERTEX);
-        let light_uniforms = UniformBindGroup::new(&device, ShaderStage::FRAGMENT);
-
+        let point_light_uniforms = UniformBindGroup::new(&device, ShaderStage::FRAGMENT);
+        let directional_light_uniforms = UniformBindGroup::new(&device, ShaderStage::FRAGMENT);
         let depth_texture = create_depth_texture(&device, &swap_chain_desc);
         let depth_texture_view = depth_texture.create_default_view();
 
-        let shadow_pass = ShadowPass::new(
-            &device,
-            vec![
-                Model::get_or_create_texture_layout(&device),
-                &camera_uniforms.bind_group_layout,
-            ],
-        )
-        .unwrap();
+        let shadow_pass =
+            ShadowPass::new(&device, vec![Model::get_or_create_texture_layout(&device)]).unwrap();
 
         let model_pass = ModelPass::new(
             &device,
             vec![
                 Model::get_or_create_texture_layout(&device),
                 &camera_uniforms.bind_group_layout,
-                &light_uniforms.bind_group_layout,
+                &point_light_uniforms.bind_group_layout,
                 ShadowTexture::get_or_create_texture_layout(&device),
+                &directional_light_uniforms.bind_group_layout,
             ],
             swap_chain_desc.format,
         )
@@ -165,8 +163,9 @@ impl WgpuRenderer {
             light_pass,
             skybox_pass,
             camera_uniforms,
-            light_uniforms,
+            point_light_uniforms,
             shadow_pass,
+            directional_light_uniforms,
         }
     }
 
@@ -214,9 +213,9 @@ impl WgpuRenderer {
                     uniform_data[i] = PointLightRaw::from((light, pos.translation()));
                     lights_used += 1;
                 });
-            self.light_uniforms.update(
+            self.point_light_uniforms.update(
                 &self.device,
-                &LightUniforms {
+                &PointLightUniforms {
                     lights_used,
                     pad: [0; 3],
                     point_lights: uniform_data,
@@ -224,6 +223,16 @@ impl WgpuRenderer {
                 encoder,
             );
         }
+
+        let query = <Read<DirectionalLight>>::query();
+        let directional_light = query.iter(world).next().unwrap();
+        self.directional_light_uniforms.update(
+            &self.device,
+            &DirectionalLightUniforms {
+                directional_light: DirectionalLightRaw::from(&*dbg!(directional_light)),
+            },
+            encoder,
+        );
     }
 
     // THIS SHOULD NOT REQUIRE MUTABLE REF TO RESOURCES!
@@ -252,10 +261,24 @@ impl WgpuRenderer {
             self.shadow_pass
                 .update_uniforms(&self.device, &raw_light, &mut encoder);
             self.shadow_pass.render(
-                // This shit doesn't work for some reaso
+                // this shit doesn't work for some reaso
                 &mut encoder,
-                &[&self.camera_uniforms.bind_group],
-                &light,
+                &[],
+                &*light,
+                world,
+                &asset_storage,
+            );
+        }
+        let directional_light_query = <Read<DirectionalLight>>::query();
+        for light in directional_light_query.iter(world) {
+            let raw_light = DirectionalLightRaw::from(&*light);
+            self.shadow_pass
+                .update_uniforms(&self.device, &raw_light, &mut encoder);
+            self.shadow_pass.render(
+                // this shit doesn't work for some reaso
+                &mut encoder,
+                &[],
+                &*light,
                 world,
                 &asset_storage,
             );
@@ -311,8 +334,9 @@ impl WgpuRenderer {
             self.model_pass.render(
                 &[
                     &self.camera_uniforms.bind_group,
-                    &self.light_uniforms.bind_group,
+                    &self.point_light_uniforms.bind_group,
                     &self.shadow_pass.shadow_texture.bind_group,
+                    &self.directional_light_uniforms.bind_group,
                 ],
                 &asset_storage,
                 world,

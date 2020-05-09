@@ -6,7 +6,7 @@ use crate::{
     graphics::model::{DrawModel, InstanceData},
     graphics::pass::VBDesc,
     graphics::wgpu_renderer::DEPTH_FORMAT,
-    graphics::{PointLight, Shader, UniformBindGroup},
+    graphics::{lighting::PointLight, Shader, UniformBindGroup},
 };
 use anyhow::Result;
 use glsl_to_spirv::ShaderType;
@@ -134,6 +134,8 @@ impl Pass for ModelPass {
         render_pass.set_bind_group(2, global_bind_groups[1], &[]);
         // 3 = shadow texture uniforms
         render_pass.set_bind_group(3, global_bind_groups[2], &[]);
+        // 4 = directional light unifroms
+        render_pass.set_bind_group(4, global_bind_groups[3], &[]);
         let mut offset_map = HashMap::new();
         let query =
             <(Read<Transform>, Tagged<ModelHandle>)>::query().filter(!component::<PointLight>());
