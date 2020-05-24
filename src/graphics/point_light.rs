@@ -1,7 +1,11 @@
-use nalgebra::Vector3;
+use nalgebra::{Matrix4, Orthographic3, Point3, Vector3};
+use once_cell::sync::Lazy;
 use zerocopy::AsBytes;
 
-#[derive(Copy, Clone, Debug)]
+static DIRECTIONAL_PROJECTION: Lazy<Orthographic3<f32>> =
+    Lazy::new(|| Orthographic3::new(-10.0, 10.0, -10.0, 10.0, 1.0, 100.0));
+
+#[derive(Debug)]
 pub struct PointLight {
     pub ambient: Vector3<f32>,
     pub specular: Vector3<f32>,
@@ -9,6 +13,7 @@ pub struct PointLight {
     pub constant: f32,
     pub linear: f32,
     pub quadratic: f32,
+    pub target_view: Option<wgpu::TextureView>,
 }
 
 #[repr(C)]
@@ -26,10 +31,23 @@ pub struct PointLightRaw {
     quadratic: f32,
     _pad3: f32,
     _pad4: f32,
+    pub light_space_matrix: [[f32; 4]; 4], //todo are these really necessary if you don't use as bytes anyways?
 }
 
-impl From<(PointLight, Vector3<f32>)> for PointLightRaw {
-    fn from((light, position): (PointLight, Vector3<f32>)) -> Self {
+impl From<(&PointLight, Vector3<f32>)> for PointLightRaw {
+    fn from((light, position): (&PointLight, Vector3<f32>)) -> Self {
+        let view = Matrix4::look_at_rh(
+            &Point3::new(position.x, position.y, position.z),
+            &Point3::new(0.0, 0.0, 0.0),
+            &Vector3::y(),
+        );
+        let light_space_matrix = DIRECTIONAL_PROJECTION.to_homogeneous() * view;
+        let projection = light_space_matrix
+            .as_slice()
+            .chunks(4)
+            .map(|chunk| [chunk[0], chunk[1], chunk[2], chunk[3]])
+            .collect::<Vec<[f32; 4]>>();
+
         PointLightRaw {
             position: [position.x, position.y, position.z],
             ambient: [light.ambient.x, light.ambient.y, light.ambient.z],
@@ -38,6 +56,7 @@ impl From<(PointLight, Vector3<f32>)> for PointLightRaw {
             constant: light.constant,
             linear: light.linear,
             quadratic: light.quadratic,
+            light_space_matrix: [projection[0], projection[1], projection[2], projection[3]],
             _pad: 0.0,
             _pad1: 0.0,
             _pad2: 0.0,
@@ -60,6 +79,7 @@ impl Default for PointLight {
             constant,
             linear,
             quadratic,
+            target_view: None,
         }
     }
 }

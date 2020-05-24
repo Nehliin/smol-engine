@@ -5,6 +5,7 @@ use wgpu::{BindGroup, CommandEncoder, RenderPass, VertexBufferDescriptor};
 
 pub mod light_object_pass;
 pub mod model_pass;
+pub mod shadow_pass;
 pub mod skybox_pass;
 
 pub trait VBDesc {

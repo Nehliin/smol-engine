@@ -111,7 +111,8 @@ impl Engine<WgpuRenderer> {
             self.process_events();
             self.current_state
                 .update(&mut self.world, &mut self.resources);
-            self.renderer.render_frame(&self.world, &mut self.resources);
+            self.renderer
+                .render_frame(&mut self.world, &mut self.resources);
             self.glfw.poll_events();
         }
     }
