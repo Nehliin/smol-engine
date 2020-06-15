@@ -1,8 +1,11 @@
-use crate::graphics::pass::VBDesc;
-use crate::graphics::texture::Texture;
 use anyhow::Result;
 use nalgebra::{Matrix4, Vector3};
 use once_cell::sync::OnceCell;
+use smol_renderer::Texture;
+use smol_renderer::{
+    texture::TextureData, GpuData, ImmutableVertexData, MutableVertexData, RenderNodeRunner,
+    SimpleTexture, VertexBuffer,
+};
 use std::ops::Range;
 use std::path::Path;
 use wgpu::{
@@ -12,146 +15,107 @@ use wgpu::{
     TextureComponentType, TextureViewDimension, VertexAttributeDescriptor, VertexBufferDescriptor,
     VertexFormat,
 };
-use zerocopy::AsBytes;
 
 const INDEX_BUFFER_SIZE: u64 = 16_000;
 
 #[repr(C)]
-#[derive(Copy, Clone, Debug, AsBytes)]
+#[derive(GpuData, Debug)]
 pub struct MeshVertex {
     position: [f32; 3],
     normal: [f32; 3],
     tex_coords: [f32; 2],
 }
 
-impl VBDesc for MeshVertex {
-    fn desc<'a>() -> VertexBufferDescriptor<'a> {
-        VertexBufferDescriptor {
-            stride: std::mem::size_of::<MeshVertex>() as BufferAddress,
-            step_mode: InputStepMode::Vertex,
-            attributes: &[
-                VertexAttributeDescriptor {
-                    offset: 0,
-                    format: VertexFormat::Float3,
-                    shader_location: 0,
-                },
-                VertexAttributeDescriptor {
-                    offset: std::mem::size_of::<Vector3<f32>>() as BufferAddress,
-                    format: VertexFormat::Float3,
-                    shader_location: 1,
-                },
-                VertexAttributeDescriptor {
-                    offset: (std::mem::size_of::<Vector3<f32>>() * 2) as BufferAddress,
-                    format: VertexFormat::Float2,
-                    shader_location: 2,
-                },
-            ],
-        }
+impl VertexBuffer for MeshVertex {
+    const STEP_MODE: wgpu::InputStepMode = wgpu::InputStepMode::Vertex;
+
+    fn get_attributes<'a>() -> &'a [wgpu::VertexAttributeDescriptor] {
+        &[
+            VertexAttributeDescriptor {
+                offset: 0,
+                format: VertexFormat::Float3,
+                shader_location: 0,
+            },
+            VertexAttributeDescriptor {
+                offset: std::mem::size_of::<Vector3<f32>>() as BufferAddress,
+                format: VertexFormat::Float3,
+                shader_location: 1,
+            },
+            VertexAttributeDescriptor {
+                offset: (std::mem::size_of::<Vector3<f32>>() * 2) as BufferAddress,
+                format: VertexFormat::Float2,
+                shader_location: 2,
+            },
+        ]
     }
 }
 
 #[repr(C)]
-#[derive(Copy, Clone, Debug)]
+#[derive(GpuData, Debug, Clone)]
 pub struct InstanceData {
     model_matrix: Matrix4<f32>,
 }
-const ROW_SIZE: BufferAddress = (std::mem::size_of::<f32>() * 4) as BufferAddress;
 
-impl VBDesc for InstanceData {
-    fn desc<'a>() -> VertexBufferDescriptor<'a> {
-        VertexBufferDescriptor {
-            stride: std::mem::size_of::<InstanceData>() as BufferAddress,
-            step_mode: InputStepMode::Instance,
-            attributes: &[
-                VertexAttributeDescriptor {
-                    offset: 0,
-                    format: VertexFormat::Float4,
-                    shader_location: 3,
-                },
-                VertexAttributeDescriptor {
-                    offset: ROW_SIZE,
-                    format: VertexFormat::Float4,
-                    shader_location: 4,
-                },
-                VertexAttributeDescriptor {
-                    offset: ROW_SIZE * 2,
-                    format: VertexFormat::Float4,
-                    shader_location: 5,
-                },
-                VertexAttributeDescriptor {
-                    offset: ROW_SIZE * 3,
-                    format: VertexFormat::Float4,
-                    shader_location: 6,
-                },
-            ],
+impl Default for InstanceData {
+    fn default() -> Self {
+        InstanceData {
+            model_matrix: Matrix4::identity(),
         }
     }
 }
 
+const ROW_SIZE: BufferAddress = (std::mem::size_of::<f32>() * 4) as BufferAddress;
+
+impl VertexBuffer for InstanceData {
+    const STEP_MODE: wgpu::InputStepMode = wgpu::InputStepMode::Instance;
+
+    fn get_attributes<'a>() -> &'a [wgpu::VertexAttributeDescriptor] {
+        &[
+            VertexAttributeDescriptor {
+                offset: 0,
+                format: VertexFormat::Float4,
+                shader_location: 3,
+            },
+            VertexAttributeDescriptor {
+                offset: ROW_SIZE,
+                format: VertexFormat::Float4,
+                shader_location: 4,
+            },
+            VertexAttributeDescriptor {
+                offset: ROW_SIZE * 2,
+                format: VertexFormat::Float4,
+                shader_location: 5,
+            },
+            VertexAttributeDescriptor {
+                offset: ROW_SIZE * 3,
+                format: VertexFormat::Float4,
+                shader_location: 6,
+            },
+        ]
+    }
+}
+
 pub struct Material {
-    pub diffuse_texture: Texture,
-    pub specular_texture: Texture,
-    pub bind_group: BindGroup,
+    pub diffuse_texture: TextureData<SimpleTexture>,
+    pub specular_texture: TextureData<SimpleTexture>,
 }
 
 pub struct Mesh {
-    pub vertex_buffer: Buffer,
+    pub vertex_buffer: ImmutableVertexData<MeshVertex>,
     pub index_buffer: Buffer,
     pub material: usize,
     pub num_indexes: u32,
 }
 
 pub struct Model {
-    pub instance_buffer: Buffer,
+    pub instance_buffer: MutableVertexData<InstanceData>,
     pub meshes: Vec<Mesh>,
     pub materials: Vec<Material>,
 }
 
 impl Model {
-    // TODO: Should this instead be in the texture struct?
-    pub fn get_or_create_texture_layout(device: &Device) -> &'static BindGroupLayout {
-        static LAYOUT: OnceCell<BindGroupLayout> = OnceCell::new();
-        LAYOUT.get_or_init(|| {
-            device.create_bind_group_layout(&BindGroupLayoutDescriptor {
-                bindings: &[
-                    // diffuse texture
-                    BindGroupLayoutEntry {
-                        binding: 0,
-                        visibility: ShaderStage::FRAGMENT,
-                        ty: BindingType::SampledTexture {
-                            multisampled: false,
-                            dimension: TextureViewDimension::D2,
-                            component_type: TextureComponentType::Float,
-                        },
-                    },
-                    BindGroupLayoutEntry {
-                        binding: 1,
-                        visibility: ShaderStage::FRAGMENT,
-                        ty: BindingType::Sampler { comparison: true },
-                    },
-                    // specular texutre
-                    BindGroupLayoutEntry {
-                        binding: 2,
-                        visibility: ShaderStage::FRAGMENT,
-                        ty: BindingType::SampledTexture {
-                            multisampled: false,
-                            dimension: TextureViewDimension::D2,
-                            component_type: TextureComponentType::Float,
-                        },
-                    },
-                    BindGroupLayoutEntry {
-                        binding: 3,
-                        visibility: ShaderStage::FRAGMENT,
-                        ty: BindingType::Sampler { comparison: true },
-                    },
-                ],
-                label: Some("Model Texture layout"),
-            })
-        })
-    }
-
     pub fn load(path: impl AsRef<Path>, device: &Device) -> Result<(Self, Vec<CommandBuffer>)> {
-        let (obj_models, obj_materials) = tobj::load_obj(path.as_ref())?;
+        let (obj_models, obj_materials) = tobj::load_obj(path.as_ref(), true)?;
         let current_folder = path.as_ref().parent().unwrap_or_else(|| {
             panic!(
                 "There must exist a parent folder for object {:?}",
@@ -169,40 +133,20 @@ impl Model {
             if specular_path.is_empty() {
                 specular_path = diffuse_path.clone(); // TODO: WORST HACK EVER
             }
-            let (diffuse_texture, diffuse_commands) =
-                Texture::load(&device, current_folder.join(diffuse_path))?;
-            let (specular_texture, specular_command) =
-                Texture::load(&device, current_folder.join(specular_path))?;
-
-            let layout = Self::get_or_create_texture_layout(device);
-
-            let bind_group = device.create_bind_group(&BindGroupDescriptor {
-                layout,
-                bindings: &[
-                    Binding {
-                        binding: 0,
-                        resource: BindingResource::TextureView(&diffuse_texture.view),
-                    },
-                    Binding {
-                        binding: 1,
-                        resource: BindingResource::Sampler(&diffuse_texture.sampler),
-                    },
-                    Binding {
-                        binding: 2,
-                        resource: BindingResource::TextureView(&specular_texture.view),
-                    },
-                    Binding {
-                        binding: 3,
-                        resource: BindingResource::Sampler(&specular_texture.sampler),
-                    },
-                ],
-                label: None,
-            });
+            let (diffuse_texture, diffuse_commands) = SimpleTexture::load(
+                &device,
+                current_folder.join(diffuse_path),
+                ShaderStage::FRAGMENT,
+            )?;
+            let (specular_texture, specular_command) = SimpleTexture::load(
+                &device,
+                current_folder.join(specular_path),
+                ShaderStage::FRAGMENT,
+            )?;
 
             materials.push(Material {
                 diffuse_texture,
                 specular_texture,
-                bind_group,
             });
             command_buffers.push(diffuse_commands);
             command_buffers.push(specular_command);
@@ -226,11 +170,14 @@ impl Model {
                     ],
                 });
             }
-            let vertex_buffer =
-                device.create_buffer_with_data(&vertices.as_bytes(), BufferUsage::VERTEX);
+            let vertex_buffer = VertexBuffer::allocate_immutable_buffer(device, &vertices);
+            
+            let indicies = unsafe {
+                std::slice::from_raw_parts(m.mesh.indices.as_ptr() as *const u8 , m.mesh.indices.len() * 4)
+            };
 
             let index_buffer =
-                device.create_buffer_with_data(&m.mesh.indices.as_bytes(), BufferUsage::INDEX);
+                device.create_buffer_with_data(&indicies, BufferUsage::INDEX);
 
             meshes.push(Mesh {
                 vertex_buffer,
@@ -239,11 +186,13 @@ impl Model {
                 num_indexes: m.mesh.indices.len() as u32,
             });
         }
-        let instance_buffer = device.create_buffer(&BufferDescriptor {
-            label: Some("Instance buffer"),
-            size: INDEX_BUFFER_SIZE, //TODO: reallocate is if it's changed and minimize data
-            usage: BufferUsage::VERTEX | BufferUsage::COPY_DST,
-        });
+        let instance_buffer_len = INDEX_BUFFER_SIZE as usize / std::mem::size_of::<InstanceData>();
+        println!("INSTANCE BUFFER LEN: {}", instance_buffer_len);
+        let buffer_data = vec![InstanceData::default(); instance_buffer_len];
+        let instance_buffer = VertexBuffer::allocate_mutable_buffer(
+            device,
+            &buffer_data,
+        );
         Ok((
             Model {
                 meshes,
@@ -267,7 +216,7 @@ pub trait DrawModel<'a> {
     fn draw_model_instanced(&mut self, model: &'a Model, instances: Range<u32>);
 }
 
-impl<'a> DrawModel<'a> for wgpu::RenderPass<'a> {
+impl<'a> DrawModel<'a> for RenderNodeRunner<'a, '_> {
     fn draw_mesh_instanced(
         &mut self,
         mesh: &'a Mesh,
@@ -275,10 +224,11 @@ impl<'a> DrawModel<'a> for wgpu::RenderPass<'a> {
         instance_buffer: &'a Buffer,
         instances: Range<u32>,
     ) {
-        self.set_vertex_buffer(0, &mesh.vertex_buffer, 0, 0);
+        self.set_vertex_buffer_data(0, &mesh.vertex_buffer);
         self.set_vertex_buffer(1, &instance_buffer, 0, 0);
         self.set_index_buffer(&mesh.index_buffer, 0, 0);
-        self.set_bind_group(0, &material.bind_group, &[]);
+        self.set_texture_data(0, &material.diffuse_texture);
+        self.set_texture_data(1, &material.specular_texture);
         self.draw_indexed(0..mesh.num_indexes, 0, instances);
     }
 

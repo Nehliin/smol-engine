@@ -10,25 +10,22 @@ use wgpu::{
 
 use super::{
     pass::{shadow_pass::ShadowPass, skybox_pass::SkyboxPass},
-    point_light::PointLightRaw,
+    point_light::{PointLightUniform, PointLightRaw},
     skybox_texture::SkyboxTexture,
-    uniform_bind_groups::{LightSpaceMatrix, LightUniforms},
     PointLight,
 };
 use crate::assets::AssetManager;
-use crate::camera::Camera;
+use crate::camera::{Camera, CameraUniform};
 use crate::graphics::model::Model;
 use crate::graphics::pass::light_object_pass::LightObjectPass;
 use crate::graphics::pass::model_pass::ModelPass;
 use crate::graphics::shadow_texture::ShadowTexture;
-use crate::graphics::uniform_bind_groups::CameraDataRaw;
 use crate::{
     components::Transform,
-    graphics::{Pass, UniformBindGroup, UniformCameraData},
+    graphics::Pass,
 };
 use nalgebra::Vector3;
-
-//type RenderPass = Box<dyn Pass>;
+use smol_renderer::UniformBindGroup;
 
 pub const DEPTH_FORMAT: wgpu::TextureFormat = wgpu::TextureFormat::Depth32Float;
 fn create_depth_texture(
@@ -60,8 +57,7 @@ pub struct WgpuRenderer {
     swap_chain: SwapChain,
     width: u32,
     height: u32,
-    camera_uniforms: UniformBindGroup<CameraDataRaw>,
-    light_uniforms: UniformBindGroup<LightUniforms>,
+    global_uniforms: UniformBindGroup,
     depth_texture: Texture,
     depth_texture_view: TextureView,
     model_pass: ModelPass,
@@ -104,8 +100,14 @@ impl WgpuRenderer {
 
         let swap_chain = device.create_swap_chain(&surface, &swap_chain_desc);
 
-        let camera_uniforms = UniformBindGroup::new(&device, ShaderStage::VERTEX);
-        let light_uniforms = UniformBindGroup::new(&device, ShaderStage::FRAGMENT);
+        let global_uniforms = UniformBindGroup::builder()
+            .add_binding::<CameraUniform>(ShaderStage::VERTEX)
+            .unwrap()
+            // TODO: is this really a global uniform?? can you use Rc and add to multiple passes?
+            .add_binding::<PointLightUniform>(ShaderStage::FRAGMENT)
+            .unwrap()
+            .build(&device);
+
 
         let depth_texture = create_depth_texture(&device, &swap_chain_desc);
         let depth_texture_view = depth_texture.create_default_view();
@@ -164,8 +166,7 @@ impl WgpuRenderer {
             model_pass,
             light_pass,
             skybox_pass,
-            camera_uniforms,
-            light_uniforms,
+            global_uniforms,
             shadow_pass,
         }
     }

@@ -2,16 +2,16 @@ use crate::assets::{AssetManager, ModelHandle};
 use crate::graphics::Pass;
 use crate::{
     components::Transform,
-    graphics::model::MeshVertex,
+    graphics::{shadow_texture::ShadowTexture, model::MeshVertex},
     graphics::model::{DrawModel, InstanceData},
-    graphics::pass::VBDesc,
     graphics::wgpu_renderer::DEPTH_FORMAT,
-    graphics::{PointLight, Shader, UniformBindGroup},
+    graphics::PointLight,
 };
 use anyhow::Result;
 use glsl_to_spirv::ShaderType;
 use legion::prelude::*;
 use nalgebra::{Matrix4, Vector3};
+use smol_renderer::{SimpleTexture, RenderNode, VertexShader, FragmentShader};
 use std::collections::HashMap;
 use wgpu::{
     BindGroup, BindGroupLayout, BlendDescriptor, BufferUsage, ColorStateDescriptor, ColorWrite,
@@ -21,7 +21,7 @@ use wgpu::{
 };
 
 pub struct ModelPass {
-    render_pipeline: RenderPipeline,
+    render_node: RenderNode,
 }
 
 impl ModelPass {
@@ -30,58 +30,24 @@ impl ModelPass {
         incoming_layouts: Vec<&BindGroupLayout>,
         color_format: TextureFormat,
     ) -> Result<Self> {
-        let vs_shader = Shader::new(
-            &device,
-            "src/shader_files/vs_model.shader",
-            ShaderType::Vertex,
-        )?;
-        let fs_shader = Shader::new(
-            &device,
-            "src/shader_files/fs_model.shader",
-            ShaderType::Fragment,
-        )?;
-
-        let render_pipeline_layout = device.create_pipeline_layout(&PipelineLayoutDescriptor {
-            bind_group_layouts: &incoming_layouts,
-        });
-
-        let render_pipeline = device.create_render_pipeline(&RenderPipelineDescriptor {
-            layout: &render_pipeline_layout,
-            vertex_stage: vs_shader.get_descriptor(),
-            fragment_stage: Some(fs_shader.get_descriptor()),
-            rasterization_state: Some(RasterizationStateDescriptor {
-                front_face: FrontFace::Ccw,
-                cull_mode: CullMode::Back,
-                depth_bias: 0,
-                depth_bias_slope_scale: 0.0,
-                depth_bias_clamp: 0.0,
-            }),
-            primitive_topology: PrimitiveTopology::TriangleList,
-            color_states: &[ColorStateDescriptor {
-                format: color_format,
-                alpha_blend: BlendDescriptor::REPLACE,
-                color_blend: BlendDescriptor::REPLACE,
-                write_mask: ColorWrite::ALL,
-            }],
-            depth_stencil_state: Some(wgpu::DepthStencilStateDescriptor {
-                format: DEPTH_FORMAT,
-                depth_write_enabled: true,
-                depth_compare: wgpu::CompareFunction::Less,
-                stencil_front: wgpu::StencilStateFaceDescriptor::IGNORE,
-                stencil_back: wgpu::StencilStateFaceDescriptor::IGNORE,
-                stencil_read_mask: 0,
-                stencil_write_mask: 0,
-            }),
-            vertex_state: VertexStateDescriptor {
-                index_format: IndexFormat::Uint32,
-                vertex_buffers: &[MeshVertex::desc(), InstanceData::desc()],
-            },
-            sample_count: 1,
-            sample_mask: !0,
-            alpha_to_coverage_enabled: false,
-        });
-
-        Ok(Self { render_pipeline })
+        let render_node = RenderNode::builder()
+            .add_vertex_buffer::<MeshVertex>()
+            .add_vertex_buffer::<InstanceData>()
+            .set_vertex_shader(VertexShader::new(device, "src/shader_files/vs_model.shader")?)
+            .set_fragment_shader(FragmentShader::new(device, "src/shader_files/fs_model.shader")?)
+            // diffuse
+            .add_texture::<SimpleTexture>(ShaderStage::FRAGMENT)
+            // specular
+            .add_texture::<SimpleTexture>(ShaderStage::FRAGMENT)
+            // shadow texture
+            .add_texture::<ShadowTexture>(ShaderStage::FRAGMENT)
+            .set_default_depth_stencil_state()
+            .set_default_rasterization_state()
+            .add_shared_uniform_bind_group(shared_uniform)
+            //.attach_global_uniform_bind_group(uniform)
+            .build(&device, color_format);
+         
+        Ok(Self { render_node})
     }
 }
 

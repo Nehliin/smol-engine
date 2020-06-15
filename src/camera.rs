@@ -1,5 +1,6 @@
 use nalgebra::geometry::Perspective3;
 use nalgebra::{Matrix4, Point3, Vector3};
+use smol_renderer::GpuData;
 
 //const UP: Vector3<f32> = Vector3::new(0.0, 1.0, 0.0);
 
@@ -10,6 +11,26 @@ pub struct Camera {
     projection_matrix: Perspective3<f32>,
     pitch: f32,
     yaw: f32,
+}
+
+#[repr(C)]
+#[derive(GpuData)]
+pub struct CameraUniform {
+    view_matrix: Matrix4<f32>,
+    projection: Matrix4<f32>,
+    view_pos: Vector3<f32>,
+}
+
+impl From<Camera> for CameraUniform {
+    fn from(camera: Camera) -> Self {
+        assert!(std::mem::size_of::<Matrix4<f32>>() == std::mem::size_of::<[[f32;4];4]>());
+        assert!(std::mem::size_of::<Vector3<f32>>() == std::mem::size_of::<[f32;3]>());
+        CameraUniform {
+            view_matrix: camera.view_matrix,
+            projection: camera.get_projection_matrix(),
+            view_pos: camera.get_vec_position()
+        }
+    }
 }
 
 #[inline]

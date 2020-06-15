@@ -8,9 +8,6 @@ pub mod model_pass;
 pub mod shadow_pass;
 pub mod skybox_pass;
 
-pub trait VBDesc {
-    fn desc<'a>() -> VertexBufferDescriptor<'a>;
-}
 
 pub trait Pass {
     fn update_uniform_data(
