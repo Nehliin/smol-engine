@@ -3,8 +3,8 @@ use nalgebra::{Matrix4, Vector3};
 use once_cell::sync::OnceCell;
 use smol_renderer::Texture;
 use smol_renderer::{
-    texture::TextureData, GpuData, ImmutableVertexData, MutableVertexData, RenderNodeRunner,
-    SimpleTexture, VertexBuffer,
+    textures::*, GpuData, ImmutableVertexData, MutableVertexData, RenderNodeRunner, SimpleTexture,
+    VertexBuffer,
 };
 use std::ops::Range;
 use std::path::Path;
@@ -133,16 +133,10 @@ impl Model {
             if specular_path.is_empty() {
                 specular_path = diffuse_path.clone(); // TODO: WORST HACK EVER
             }
-            let (diffuse_texture, diffuse_commands) = SimpleTexture::load(
-                &device,
-                current_folder.join(diffuse_path),
-                ShaderStage::FRAGMENT,
-            )?;
-            let (specular_texture, specular_command) = SimpleTexture::load(
-                &device,
-                current_folder.join(specular_path),
-                ShaderStage::FRAGMENT,
-            )?;
+            let (diffuse_texture, diffuse_commands) =
+                SimpleTexture::load_texture(&device, current_folder.join(diffuse_path))?;
+            let (specular_texture, specular_command) =
+                SimpleTexture::load_texture(&device, current_folder.join(specular_path))?;
 
             materials.push(Material {
                 diffuse_texture,
@@ -171,13 +165,15 @@ impl Model {
                 });
             }
             let vertex_buffer = VertexBuffer::allocate_immutable_buffer(device, &vertices);
-            
+
             let indicies = unsafe {
-                std::slice::from_raw_parts(m.mesh.indices.as_ptr() as *const u8 , m.mesh.indices.len() * 4)
+                std::slice::from_raw_parts(
+                    m.mesh.indices.as_ptr() as *const u8,
+                    m.mesh.indices.len() * 4,
+                )
             };
 
-            let index_buffer =
-                device.create_buffer_with_data(&indicies, BufferUsage::INDEX);
+            let index_buffer = device.create_buffer_with_data(&indicies, BufferUsage::INDEX);
 
             meshes.push(Mesh {
                 vertex_buffer,
@@ -189,10 +185,7 @@ impl Model {
         let instance_buffer_len = INDEX_BUFFER_SIZE as usize / std::mem::size_of::<InstanceData>();
         println!("INSTANCE BUFFER LEN: {}", instance_buffer_len);
         let buffer_data = vec![InstanceData::default(); instance_buffer_len];
-        let instance_buffer = VertexBuffer::allocate_mutable_buffer(
-            device,
-            &buffer_data,
-        );
+        let instance_buffer = VertexBuffer::allocate_mutable_buffer(device, &buffer_data);
         Ok((
             Model {
                 meshes,

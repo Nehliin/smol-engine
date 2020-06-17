@@ -26,6 +26,7 @@ use crate::{
 };
 use nalgebra::Vector3;
 use smol_renderer::UniformBindGroup;
+use std::sync::Arc;
 
 pub const DEPTH_FORMAT: wgpu::TextureFormat = wgpu::TextureFormat::Depth32Float;
 fn create_depth_texture(
@@ -100,13 +101,13 @@ impl WgpuRenderer {
 
         let swap_chain = device.create_swap_chain(&surface, &swap_chain_desc);
 
-        let global_uniforms = UniformBindGroup::builder()
+        let global_camera_uniforms = Arc::new(UniformBindGroup::builder()
             .add_binding::<CameraUniform>(ShaderStage::VERTEX)
             .unwrap()
             // TODO: is this really a global uniform?? can you use Rc and add to multiple passes?
-            .add_binding::<PointLightUniform>(ShaderStage::FRAGMENT)
-            .unwrap()
-            .build(&device);
+            //.add_binding::<PointLightUniform>(ShaderStage::FRAGMENT)
+            //.unwrap()
+            .build(&device));
 
 
         let depth_texture = create_depth_texture(&device, &swap_chain_desc);
@@ -115,8 +116,7 @@ impl WgpuRenderer {
         let shadow_pass = ShadowPass::new(
             &device,
             vec![
-                Model::get_or_create_texture_layout(&device),
-                &camera_uniforms.bind_group_layout,
+                Arc::clone(global_camera_uniforms),
             ],
         )
         .unwrap();
@@ -124,10 +124,8 @@ impl WgpuRenderer {
         let model_pass = ModelPass::new(
             &device,
             vec![
-                Model::get_or_create_texture_layout(&device),
-                &camera_uniforms.bind_group_layout,
+                Arc::clone(global_camera_uniforms),
                 &light_uniforms.bind_group_layout,
-                ShadowTexture::get_or_create_texture_layout(&device),
             ],
             swap_chain_desc.format,
         )
@@ -199,33 +197,7 @@ impl WgpuRenderer {
         )
     }
 
-    pub fn update_lights(&self, world: &World, encoder: &mut CommandEncoder) {
-        let query = <(Read<PointLight>, Read<Transform>)>::query();
-        for chunk in query.par_iter_chunks(world) {
-            let lights = chunk.components::<PointLight>().unwrap();
-            let positions = chunk.components::<Transform>().unwrap();
-            let mut uniform_data =
-                [PointLightRaw::from((&PointLight::default(), Vector3::new(0.0, 0.0, 0.0))); 16];
-            let mut lights_used = 0;
-            lights
-                .iter()
-                .zip(positions.iter())
-                .enumerate()
-                .for_each(|(i, (light, pos))| {
-                    uniform_data[i] = PointLightRaw::from((light, pos.translation()));
-                    lights_used += 1;
-                });
-            self.light_uniforms.update(
-                &self.device,
-                &LightUniforms {
-                    lights_used,
-                    pad: [0; 3],
-                    point_lights: uniform_data,
-                },
-                encoder,
-            );
-        }
-    }
+    
 
     // THIS SHOULD NOT REQUIRE MUTABLE REF TO RESOURCES!
     pub fn render_frame(&mut self, world: &mut World, resources: &mut Resources) {
