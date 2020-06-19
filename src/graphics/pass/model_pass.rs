@@ -2,7 +2,6 @@ use crate::assets::{AssetManager, ModelHandle};
 use crate::graphics::Pass;
 use crate::{
     components::Transform,
-    graphics::wgpu_renderer::DEPTH_FORMAT,
     graphics::PointLight,
     graphics::{model::MeshVertex, shadow_texture::ShadowTexture},
     graphics::{
@@ -11,25 +10,22 @@ use crate::{
     },
 };
 use anyhow::Result;
-use glsl_to_spirv::ShaderType;
 use legion::prelude::*;
-use nalgebra::{Matrix4, Vector3};
+use nalgebra::Vector3;
 use smol_renderer::{
-    FragmentShader, GpuData, RenderNode, SimpleTexture, UniformBindGroup, VertexShader,
+    FragmentShader, GpuData, RenderNode, SimpleTexture, TextureData, UniformBindGroup, VertexShader,
 };
-use std::{collections::HashMap, sync::Arc};
-use wgpu::{
-    BindGroup, BindGroupLayout, BlendDescriptor, BufferUsage, ColorStateDescriptor, ColorWrite,
-    CommandEncoder, CullMode, Device, FrontFace, IndexFormat, PipelineLayoutDescriptor,
-    PrimitiveTopology, RasterizationStateDescriptor, RenderPass, RenderPassDescriptor,
-    RenderPipeline, RenderPipelineDescriptor, ShaderStage, TextureFormat, VertexStateDescriptor,
-};
+use std::{collections::HashMap, rc::Rc, sync::Arc};
+use wgpu::{CommandEncoder, Device, RenderPassDescriptor, ShaderStage, TextureFormat};
 
 pub struct ModelPass {
+    //todo: maybe solve in another way instead of Rc (weak ptr)?
+    shadow_texture: Rc<TextureData<ShadowTexture>>,
     render_node: RenderNode,
 }
 
 pub const MAX_POINT_LIGHTS: u32 = 16;
+#[repr(C)]
 #[derive(Debug, Clone)]
 pub struct PointLightsUniforms {
     lights_used: i32,
@@ -39,15 +35,10 @@ pub struct PointLightsUniforms {
 
 unsafe impl GpuData for PointLightsUniforms {
     fn as_raw_bytes(&self) -> &[u8] {
-        // THIS MIGHT BE FUCKED 
+        // THIS MIGHT BE FUCKED
         let total_size = std::mem::size_of::<i32>() * 4
-            + std::mem::size_of::<PointLightRaw>() * MAX_POINT_LIGHTS;
-        unsafe {
-            std::slice::from_raw_parts(
-                smol_renderer as *const Self as *const u8,
-                total_size,
-            )
-        }
+            + std::mem::size_of::<PointLightRaw>() * MAX_POINT_LIGHTS as usize;
+        unsafe { std::slice::from_raw_parts(self as *const Self as *const u8, total_size) }
     }
 }
 
@@ -55,6 +46,7 @@ impl ModelPass {
     pub fn new(
         device: &Device,
         global_uniforms: Vec<Arc<UniformBindGroup>>,
+        shadow_texture: Rc<ShadowTexture>,
         color_format: TextureFormat,
     ) -> Result<Self> {
         let render_node = RenderNode::builder()
@@ -85,17 +77,21 @@ impl ModelPass {
             //.attach_global_uniform_bind_group(uniform)
             .build(&device, color_format)?;
 
-        Ok(Self { render_node })
+        Ok(Self {
+            render_node,
+            shadow_texture,
+        })
     }
 
-    pub fn update_lights(&self, world: &World, encoder: &mut CommandEncoder) {
+    pub fn update_lights(&self, device: &Device, world: &World, encoder: &mut CommandEncoder) {
         let query = <(Read<PointLight>, Read<Transform>)>::query();
         // TODO: only runs once unecessary loop
         for chunk in query.par_iter_chunks(world) {
             let lights = chunk.components::<PointLight>().unwrap();
             let positions = chunk.components::<Transform>().unwrap();
             let mut uniform_data =
-                [PointLightRaw::from((&PointLight::default(), Vector3::new(0.0, 0.0, 0.0))); MAX_POINT_LIGHTS];
+                [PointLightRaw::from((&PointLight::default(), Vector3::new(0.0, 0.0, 0.0)));
+                    MAX_POINT_LIGHTS as usize];
             let mut lights_used = 0;
             lights
                 .iter()
@@ -106,7 +102,7 @@ impl ModelPass {
                     lights_used += 1;
                 });
             self.render_node.update(
-                &self.device,
+                device,
                 encoder,
                 1,
                 &PointLightsUniforms {
@@ -127,7 +123,7 @@ impl Pass for ModelPass {
         device: &Device,
         encoder: &mut CommandEncoder,
     ) {
-        self.update_lights(world, encoder);
+        self.update_lights(device, world, encoder);
 
         let mut offsets = HashMap::new();
         let query = <(Read<Transform>, Tagged<ModelHandle>)>::query();
@@ -136,21 +132,11 @@ impl Pass for ModelPass {
             let transforms = chunk.components::<Transform>().unwrap();
             let model_matrices = transforms
                 .iter()
-                .map(|trans| trans.get_model_matrix())
-                .collect::<Vec<Matrix4<f32>>>();
-            // Safety the vector is owned within the same scope so this slice is also valid within
-            // the same scope
-            let data = unsafe {
-                std::slice::from_raw_parts(
-                    model_matrices.as_ptr() as *const u8,
-                    model_matrices.len() * std::mem::size_of::<Matrix4<f32>>(),
-                )
-            };
+                .map(|trans| InstanceData::new(trans.get_model_matrix()))
+                .collect::<Vec<InstanceData>>();
             let offset = *offsets.get(model).unwrap_or(&0);
-            let temp_buf =
-                device.create_buffer_with_data(data, BufferUsage::VERTEX | BufferUsage::COPY_SRC);
             let instance_buffer = &asset_manager.get_model(model).unwrap().instance_buffer;
-            encoder.copy_buffer_to_buffer(&temp_buf, 0, instance_buffer, offset, data.len() as u64);
+            instance_buffer.update(device, encoder, &model_matrices);
             offsets.insert(model.clone(), offset + model_matrices.len() as u64);
         }
     }
@@ -163,7 +149,7 @@ impl Pass for ModelPass {
         render_pass_descriptor: RenderPassDescriptor,
     ) {
         let mut runner = self.render_node.runner(encoder, render_pass_descriptor);
-
+        runner.set_texture_data(2, &self.shadow_texture);
         let mut offset_map = HashMap::new();
         let query =
             <(Read<Transform>, Tagged<ModelHandle>)>::query().filter(!component::<PointLight>());

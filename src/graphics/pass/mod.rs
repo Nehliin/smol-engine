@@ -1,7 +1,7 @@
 use crate::assets::AssetManager;
 use legion::prelude::World;
 use wgpu::Device;
-use wgpu::{BindGroup, CommandEncoder, RenderPass, VertexBufferDescriptor};
+use wgpu::{BindGroup, CommandEncoder, RenderPass, VertexBufferDescriptor, RenderPassDescriptor};
 
 pub mod light_object_pass;
 pub mod model_pass;
@@ -19,9 +19,9 @@ pub trait Pass {
     );
     fn render<'encoder>(
         &'encoder self,
-        global_bind_groups: &[&'encoder BindGroup],
         asset_manager: &'encoder AssetManager,
         world: &World,
-        render_pass: &mut RenderPass<'encoder>,
-    );
+        encoder: &mut CommandEncoder,
+        render_pass_descriptor: RenderPassDescriptor,
+    ); 
 }
