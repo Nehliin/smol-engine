@@ -1,4 +1,4 @@
-use super::{Pass, VBDesc};
+use super::Pass;
 use crate::{
     assets::{AssetManager, ModelHandle},
     components::Transform,
@@ -6,15 +6,17 @@ use crate::{
         model::{DrawModel, InstanceData, MeshVertex},
         point_light::PointLightRaw,
         shadow_texture::{ShadowTexture, SHADOW_FORMAT},
-        uniform_bind_groups::LightSpaceMatrix,
-        PointLight, Shader, UniformBindGroup,
+        PointLight,
     },
 };
 use anyhow::Result;
 use legion::prelude::World;
 use legion::prelude::*;
-use std::collections::HashMap;
-use wgpu::{BindGroup, BindGroupLayout, CommandBuffer, Device};
+use smol_renderer::{
+    FragmentShader, RenderNode, Texture, TextureData, UniformBindGroup, VertexShader,
+};
+use std::{collections::HashMap, rc::Rc, sync::Arc};
+use wgpu::{BindGroup, BindGroupLayout, CommandBuffer, Device, ShaderStage};
 
 // TODO:
 // Sample the shadow textures in the model pass (add them as an internal the bindgroup)
@@ -22,13 +24,36 @@ use wgpu::{BindGroup, BindGroupLayout, CommandBuffer, Device};
 // Don't make the point light contian the target_view, that should be a separate component
 // Update the resize method
 pub struct ShadowPass {
-    render_pipeline: wgpu::RenderPipeline,
-    light_projection_uniforms: UniformBindGroup<LightSpaceMatrix>,
-    pub shadow_texture: ShadowTexture,
+    render_node: RenderNode,
+    //light_projection_uniforms: UniformBindGroup<LightSpaceMatrix>,
+    shadow_texture: Rc<TextureData<ShadowTexture>>,
 }
 
 impl ShadowPass {
-    pub fn new(device: &Device, incoming_layouts: Vec<&BindGroupLayout>) -> Result<Self> {
+    pub fn new(device: &Device, global_uniforms: Vec<Arc<UniformBindGroup>>) -> Result<Self> {
+        let render_node = RenderNode::builder()
+            .add_vertex_buffer::<MeshVertex>()
+            .add_vertex_buffer::<InstanceData>()
+            .set_vertex_shader(VertexShader::new(
+                device,
+                "src/shader_files/vs_shadow.shader",
+            )?)
+            .set_fragment_shader(FragmentShader::new(
+                device,
+                "src/shader_files/fs_shadow.shader",
+            )?)
+            // shadow texture
+            .add_texture::<ShadowTexture>()
+            .set_default_depth_stencil_state()
+            .set_default_rasterization_state()
+            .add_shared_uniform_bind_group(global_uniforms[0])
+            .add_local_uniform_bind_group(
+                UniformBindGroup::builder()
+                    .add_binding::<LightSpaceMatrix>(ShaderStage::FRAGMENT)?
+                    .build(device),
+            )
+            //.attach_global_uniform_bind_group(uniform)
+            .build(&device, color_format)?;
         let vs_shader = Shader::new(
             &device,
             "src/shader_files/vs_shadow.shader",
@@ -44,7 +69,7 @@ impl ShadowPass {
         let mut bind_group_layouts = incoming_layouts;
         bind_group_layouts.push(&light_projection.bind_group_layout);
 
-        let shadow_texture = ShadowTexture::new(device);
+        let shadow_texture = ShadowTexture::allocate_texture(device);
 
         let render_pipeline_layout =
             device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
@@ -58,7 +83,7 @@ impl ShadowPass {
             rasterization_state: Some(wgpu::RasterizationStateDescriptor {
                 front_face: wgpu::FrontFace::Ccw,
                 cull_mode: wgpu::CullMode::Front,
-                depth_bias: 0,               // Biliniear filtering
+                depth_bias: 0, // Biliniear filtering
                 depth_bias_slope_scale: 2.0,
                 depth_bias_clamp: 0.0,
             }),
