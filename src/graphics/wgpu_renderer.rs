@@ -10,7 +10,7 @@ use wgpu::{
 
 use super::{
     pass::{shadow_pass::ShadowPass, skybox_pass::SkyboxPass},
-    point_light::{PointLightUniform, PointLightRaw},
+    point_light::{PointLightRaw, PointLightUniform},
     skybox_texture::SkyboxTexture,
     PointLight,
 };
@@ -20,10 +20,7 @@ use crate::graphics::model::Model;
 use crate::graphics::pass::light_object_pass::LightObjectPass;
 use crate::graphics::pass::model_pass::ModelPass;
 use crate::graphics::shadow_texture::ShadowTexture;
-use crate::{
-    components::Transform,
-    graphics::Pass,
-};
+use crate::{components::Transform, graphics::Pass};
 use nalgebra::Vector3;
 use smol_renderer::UniformBindGroup;
 use std::sync::Arc;
@@ -101,39 +98,31 @@ impl WgpuRenderer {
 
         let swap_chain = device.create_swap_chain(&surface, &swap_chain_desc);
 
-        let global_camera_uniforms = Arc::new(UniformBindGroup::builder()
-            .add_binding::<CameraUniform>(ShaderStage::VERTEX)
-            .unwrap()
-            // TODO: is this really a global uniform?? can you use Rc and add to multiple passes?
-            //.add_binding::<PointLightUniform>(ShaderStage::FRAGMENT)
-            //.unwrap()
-            .build(&device));
-
+        let global_camera_uniforms = Arc::new(
+            UniformBindGroup::builder()
+                .add_binding::<CameraUniform>(ShaderStage::VERTEX)
+                .unwrap()
+                // TODO: is this really a global uniform?? can you use Rc and add to multiple passes?
+                //.add_binding::<PointLightUniform>(ShaderStage::FRAGMENT)
+                //.unwrap()
+                .build(&device),
+        );
 
         let depth_texture = create_depth_texture(&device, &swap_chain_desc);
         let depth_texture_view = depth_texture.create_default_view();
 
-        let shadow_pass = ShadowPass::new(
-            &device,
-            vec![
-                Arc::clone(global_camera_uniforms),
-            ],
-        )
-        .unwrap();
+        let shadow_pass =
+            ShadowPass::new(&device, vec![Arc::clone(&global_camera_uniforms)]).unwrap();
 
         let model_pass = ModelPass::new(
             &device,
-            vec![
-                Arc::clone(global_camera_uniforms),
-                &light_uniforms.bind_group_layout,
-            ],
+            vec![Arc::clone(&global_camera_uniforms)],
             swap_chain_desc.format,
         )
         .unwrap();
         let light_pass = LightObjectPass::new(
             &device,
-            &Model::get_or_create_texture_layout(&device),
-            &camera_uniforms.bind_group_layout,
+            vec![Arc::clone(&global_camera_uniforms)],
             swap_chain_desc.format,
         );
 
@@ -196,8 +185,6 @@ impl WgpuRenderer {
             encoder,
         )
     }
-
-    
 
     // THIS SHOULD NOT REQUIRE MUTABLE REF TO RESOURCES!
     pub fn render_frame(&mut self, world: &mut World, resources: &mut Resources) {
