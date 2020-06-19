@@ -3,16 +3,13 @@ use nalgebra::{Matrix4, Vector3};
 use once_cell::sync::OnceCell;
 use smol_renderer::Texture;
 use smol_renderer::{
-    textures::*, GpuData, ImmutableVertexData, MutableVertexData, RenderNodeRunner, SimpleTexture,
-    VertexBuffer,
+    GpuData, ImmutableVertexData, LoadableTexture, MutableVertexData, RenderNodeRunner,
+    SimpleTexture, TextureData, VertexBuffer,
 };
 use std::ops::Range;
 use std::path::Path;
 use wgpu::{
-    BindGroup, BindGroupDescriptor, BindGroupLayout, BindGroupLayoutDescriptor,
-    BindGroupLayoutEntry, Binding, BindingResource, BindingType, Buffer, BufferAddress,
-    BufferDescriptor, BufferUsage, CommandBuffer, Device, InputStepMode, ShaderStage,
-    TextureComponentType, TextureViewDimension, VertexAttributeDescriptor, VertexBufferDescriptor,
+    Buffer, BufferAddress, BufferUsage, CommandBuffer, Device, VertexAttributeDescriptor,
     VertexFormat,
 };
 
@@ -56,6 +53,12 @@ pub struct InstanceData {
     model_matrix: Matrix4<f32>,
 }
 
+impl InstanceData {
+    pub fn new(model_matrix: Matrix4<f32>) -> Self {
+        InstanceData { model_matrix }
+    }
+}
+
 impl Default for InstanceData {
     fn default() -> Self {
         InstanceData {
@@ -94,7 +97,7 @@ impl VertexBuffer for InstanceData {
         ]
     }
 }
-
+// TODO: This should be its own texture type
 pub struct Material {
     pub diffuse_texture: TextureData<SimpleTexture>,
     pub specular_texture: TextureData<SimpleTexture>,
@@ -196,36 +199,48 @@ impl Model {
         ))
     }
 }
-
-pub trait DrawModel<'a> {
+// TODO: rethink if this is even needed anymore?
+pub trait DrawModel<'b> {
     fn draw_mesh_instanced(
         &mut self,
-        mesh: &'a Mesh,
-        material: &'a Material,
-        instance_buffer: &'a Buffer,
+        mesh: &'b Mesh,
+        material: &'b Material,
+        instance_buffer: &'b MutableVertexData<InstanceData>,
         instances: Range<u32>,
     );
 
-    fn draw_model_instanced(&mut self, model: &'a Model, instances: Range<u32>);
+    fn draw_untextured(&mut self, model: &'b Model, instances: Range<u32>);
+
+    fn draw_model_instanced(&mut self, model: &'b Model, instances: Range<u32>);
 }
 
-impl<'a> DrawModel<'a> for RenderNodeRunner<'a, '_> {
+impl<'a, 'b> DrawModel<'b> for RenderNodeRunner<'a, 'b> {
     fn draw_mesh_instanced(
         &mut self,
-        mesh: &'a Mesh,
-        material: &'a Material,
-        instance_buffer: &'a Buffer,
+        mesh: &'b Mesh,
+        material: &'b Material,
+        instance_buffer: &'b MutableVertexData<InstanceData>,
         instances: Range<u32>,
     ) {
         self.set_vertex_buffer_data(0, &mesh.vertex_buffer);
-        self.set_vertex_buffer(1, &instance_buffer, 0, 0);
+        self.set_vertex_buffer_data(1, instance_buffer);
         self.set_index_buffer(&mesh.index_buffer, 0, 0);
         self.set_texture_data(0, &material.diffuse_texture);
         self.set_texture_data(1, &material.specular_texture);
         self.draw_indexed(0..mesh.num_indexes, 0, instances);
     }
 
-    fn draw_model_instanced(&mut self, model: &'a Model, instances: Range<u32>) {
+    fn draw_untextured(&mut self, model: &'b Model, instances: Range<u32>) {
+        let instance_buffer = &model.instance_buffer;
+        for mesh in &model.meshes {
+            let material = &model.materials[mesh.material];
+            self.set_vertex_buffer_data(0, &mesh.vertex_buffer);
+            self.set_vertex_buffer_data(1, instance_buffer);
+            self.set_index_buffer(&mesh.index_buffer, 0, 0);
+        }
+    }
+
+    fn draw_model_instanced(&mut self, model: &'b Model, instances: Range<u32>) {
         let instance_buffer = &model.instance_buffer;
         for mesh in &model.meshes {
             let material = &model.materials[mesh.material];
