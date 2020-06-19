@@ -5,7 +5,7 @@ layout(location=2) in vec2 tex_coords;
 
 layout(location=3) in mat4 model;
 
-layout(set=1, binding=0)
+layout(set=0, binding=0)
 uniform Uniforms {
     mat4 view;
     mat4 projection;
