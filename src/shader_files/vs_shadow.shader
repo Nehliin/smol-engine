@@ -6,15 +6,7 @@ layout(location=2) in vec2 tex_coords;
 
 layout(location=3) in mat4 model;
 
-// I don't think these are actually needed
-layout(set=1, binding=0)
-uniform Uniforms {
-    mat4 view;
-    mat4 projection;
-    vec3 view_pos;
-};
-
-layout(set=2, binding=0) uniform LightProjection {
+layout(set=0, binding=0) uniform LightProjection {
     mat4 light_projection;
 };
 
