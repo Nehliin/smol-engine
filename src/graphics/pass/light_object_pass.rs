@@ -35,11 +35,12 @@ impl LightObjectPass {
                 device,
                 "src/shader_files/fs_light.shader",
             )?)
+            .add_default_color_state_desc(color_format)
             .set_default_depth_stencil_state()
             .set_default_rasterization_state()
             .add_shared_uniform_bind_group(global_uniforms[0])
             //.attach_global_uniform_bind_group(uniform)
-            .build(&device, color_format)?;
+            .build(&device)?;
         Ok(LightObjectPass { render_node })
     }
 }

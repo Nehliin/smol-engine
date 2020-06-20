@@ -26,27 +26,19 @@ pub struct ModelPass {
 
 pub const MAX_POINT_LIGHTS: u32 = 16;
 #[repr(C)]
-#[derive(Debug, Clone)]
+#[derive(Debug, GpuData, Clone)]
 pub struct PointLightsUniforms {
     lights_used: i32,
     _pad: [i32; 3],
     lights: [PointLightRaw; MAX_POINT_LIGHTS as usize],
 }
 
-unsafe impl GpuData for PointLightsUniforms {
-    fn as_raw_bytes(&self) -> &[u8] {
-        // THIS MIGHT BE FUCKED
-        let total_size = std::mem::size_of::<i32>() * 4
-            + std::mem::size_of::<PointLightRaw>() * MAX_POINT_LIGHTS as usize;
-        unsafe { std::slice::from_raw_parts(self as *const Self as *const u8, total_size) }
-    }
-}
 
 impl ModelPass {
     pub fn new(
         device: &Device,
         global_uniforms: Vec<Arc<UniformBindGroup>>,
-        shadow_texture: Rc<ShadowTexture>,
+        shadow_texture: Rc<TextureData<ShadowTexture>>,
         color_format: TextureFormat,
     ) -> Result<Self> {
         let render_node = RenderNode::builder()
@@ -66,6 +58,7 @@ impl ModelPass {
             .add_texture::<SimpleTexture>()
             // shadow texture
             .add_texture::<ShadowTexture>()
+            .set_default_color_state_desc(color_format)
             .set_default_depth_stencil_state()
             .set_default_rasterization_state()
             .add_shared_uniform_bind_group(global_uniforms[0])
@@ -74,8 +67,7 @@ impl ModelPass {
                     .add_binding::<PointLightsUniforms>(ShaderStage::FRAGMENT)?
                     .build(device),
             )
-            //.attach_global_uniform_bind_group(uniform)
-            .build(&device, color_format)?;
+            .build(&device)?;
 
         Ok(Self {
             render_node,
