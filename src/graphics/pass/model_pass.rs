@@ -104,7 +104,7 @@ impl ModelPass {
                     _pad: [0; 3],
                     lights: uniform_data,
                 },
-            );
+            ).unwrap();
         }
     }
 }

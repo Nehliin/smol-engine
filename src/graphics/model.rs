@@ -231,10 +231,10 @@ impl<'a, 'b> DrawModel<'b> for RenderNodeRunner<'a, 'b> {
     fn draw_untextured(&mut self, model: &'b Model, instances: Range<u32>) {
         let instance_buffer = &model.instance_buffer;
         for mesh in &model.meshes {
-            let material = &model.materials[mesh.material];
             self.set_vertex_buffer_data(0, &mesh.vertex_buffer);
             self.set_vertex_buffer_data(1, instance_buffer);
             self.set_index_buffer(&mesh.index_buffer, 0, 0);
+            self.draw_indexed(0..mesh.num_indexes, 0, instances.clone());
         }
     }
 
