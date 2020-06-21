@@ -1,4 +1,3 @@
-use anyhow::{anyhow, Context, Result};
 use image::{DynamicImage, GenericImage};
 use once_cell::sync::OnceCell;
 use smol_renderer::{LoadableTexture, RenderError, TextureData, TextureShaderLayout};
@@ -52,10 +51,9 @@ impl TextureShaderLayout for SkyboxTexture {
 impl LoadableTexture for SkyboxTexture {
     fn load_texture(
         device: &Device,
-        path: impl AsRef<Path>,
+        dir_path: impl AsRef<Path>,
     ) -> Result<(TextureData<Self>, CommandBuffer), RenderError> {
-        let directory_iterator = std::fs::read_dir(dir_path.as_ref())
-            .with_context(|| "Skybox images must be in a separate directory")?;
+        let directory_iterator = std::fs::read_dir(dir_path.as_ref())?;
 
         let mut paths = directory_iterator
             .filter_map(Result::ok)
@@ -63,19 +61,19 @@ impl LoadableTexture for SkyboxTexture {
             .filter(|path| !path.is_dir())
             .collect::<Vec<_>>();
 
-        if paths.len() != REQUIRED_SKYBOX_TEXTURES {
-            return Err(anyhow!(
+        assert!(
+            paths.len() == REQUIRED_SKYBOX_TEXTURES,
+            format!(
                 "Skybox texture directory {:?} doesn't contain exacty 6 images",
                 dir_path.as_ref()
-            ));
-        }
+            )
+        );
         // sort the paths in order (skybox textures are ordered)
         paths.sort();
         let images = paths
             .iter()
             .map(image::open)
-            .collect::<Result<Vec<DynamicImage>, _>>()
-            .with_context(|| "Failed to open skybox image part")?;
+            .collect::<Result<Vec<DynamicImage>, _>>()?;
 
         let (width, height) = images.first().unwrap().dimensions();
 
@@ -116,12 +114,7 @@ impl LoadableTexture for SkyboxTexture {
         let bind_group = Self::create_bind_group(device, &texture_view, &sampler);
 
         Ok((
-            TextureDat::new(
-                sampler,
-                texture,
-                texture_view,
-                bind_group,
-            ),
+            TextureData::new(bind_group, texture, vec![texture_view], sampler),
             command_encoder.finish(),
         ))
     }
@@ -173,7 +166,7 @@ impl SkyboxTexture {
         texture_view: &TextureView,
         sampler: &Sampler,
     ) -> BindGroup {
-        let bind_group_layout = Self::get_bind_group_layout(device);
+        let bind_group_layout = Self::get_layout(device);
         device.create_bind_group(&BindGroupDescriptor {
             layout: &bind_group_layout,
             bindings: &[

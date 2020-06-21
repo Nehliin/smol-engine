@@ -1,18 +1,20 @@
-use crate::assets::{AssetManager, ModelHandle};
-use crate::components::Transform;
-use crate::graphics::model::{DrawModel, InstanceData, MeshVertex};
-use crate::graphics::wgpu_renderer::DEPTH_FORMAT;
-use crate::graphics::{Pass, PointLight};
+use std::sync::Arc;
+
 use anyhow::Result;
 use legion::prelude::*;
 use smol_renderer::{FragmentShader, RenderNode, SimpleTexture, UniformBindGroup, VertexShader};
-use std::sync::Arc;
 use wgpu::{
     BindGroup, BindGroupLayout, BlendDescriptor, ColorStateDescriptor, ColorWrite, CommandEncoder,
     CullMode, Device, FrontFace, IndexFormat, PipelineLayoutDescriptor, PrimitiveTopology,
     RasterizationStateDescriptor, RenderPass, RenderPassDescriptor, RenderPipeline,
     RenderPipelineDescriptor, TextureFormat, VertexStateDescriptor,
 };
+
+use crate::assets::{AssetManager, ModelHandle};
+use crate::components::Transform;
+use crate::graphics::model::{DrawModel, InstanceData, MeshVertex};
+use crate::graphics::wgpu_renderer::DEPTH_FORMAT;
+use crate::graphics::{Pass, PointLight};
 
 pub struct LightObjectPass {
     render_node: RenderNode,
@@ -38,7 +40,7 @@ impl LightObjectPass {
             .add_default_color_state_desc(color_format)
             .set_default_depth_stencil_state()
             .set_default_rasterization_state()
-            .add_shared_uniform_bind_group(global_uniforms[0])
+            .add_shared_uniform_bind_group(global_uniforms[0].clone())
             //.attach_global_uniform_bind_group(uniform)
             .build(&device)?;
         Ok(LightObjectPass { render_node })

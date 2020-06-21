@@ -1,3 +1,13 @@
+use std::{collections::HashMap, rc::Rc, sync::Arc};
+
+use anyhow::Result;
+use legion::prelude::*;
+use nalgebra::Vector3;
+use smol_renderer::{
+    FragmentShader, GpuData, RenderNode, SimpleTexture, TextureData, UniformBindGroup, VertexShader,
+};
+use wgpu::{CommandEncoder, Device, RenderPassDescriptor, ShaderStage, TextureFormat};
+
 use crate::assets::{AssetManager, ModelHandle};
 use crate::graphics::Pass;
 use crate::{
@@ -9,14 +19,6 @@ use crate::{
         point_light::PointLightRaw,
     },
 };
-use anyhow::Result;
-use legion::prelude::*;
-use nalgebra::Vector3;
-use smol_renderer::{
-    FragmentShader, GpuData, RenderNode, SimpleTexture, TextureData, UniformBindGroup, VertexShader,
-};
-use std::{collections::HashMap, rc::Rc, sync::Arc};
-use wgpu::{CommandEncoder, Device, RenderPassDescriptor, ShaderStage, TextureFormat};
 
 pub struct ModelPass {
     //todo: maybe solve in another way instead of Rc (weak ptr)?
@@ -25,6 +27,7 @@ pub struct ModelPass {
 }
 
 pub const MAX_POINT_LIGHTS: u32 = 16;
+
 #[repr(C)]
 #[derive(Debug, GpuData, Clone)]
 pub struct PointLightsUniforms {
@@ -32,7 +35,6 @@ pub struct PointLightsUniforms {
     _pad: [i32; 3],
     lights: [PointLightRaw; MAX_POINT_LIGHTS as usize],
 }
-
 
 impl ModelPass {
     pub fn new(
@@ -61,7 +63,7 @@ impl ModelPass {
             .add_default_color_state_desc(color_format)
             .set_default_depth_stencil_state()
             .set_default_rasterization_state()
-            .add_shared_uniform_bind_group(global_uniforms[0])
+            .add_shared_uniform_bind_group(global_uniforms[0].clone())
             .add_local_uniform_bind_group(
                 UniformBindGroup::builder()
                     .add_binding::<PointLightsUniforms>(ShaderStage::FRAGMENT)?

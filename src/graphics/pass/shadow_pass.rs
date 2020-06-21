@@ -15,8 +15,8 @@ use legion::prelude::*;
 use smol_renderer::{
     FragmentShader, GpuData, RenderNode, TextureData, UniformBindGroup, VertexShader,
 };
-use std::{collections::HashMap, rc::Rc, sync::Arc};
-use wgpu::{BindGroup, BindGroupLayout, CommandBuffer, Device, ShaderStage};
+use std::{collections::HashMap, rc::Rc};
+use wgpu::{Device, ShaderStage};
 
 #[repr(C)]
 #[derive(Default, Clone, GpuData)]
@@ -115,7 +115,9 @@ impl ShadowPass {
         light: &PointLightRaw,
         encoder: &mut wgpu::CommandEncoder,
     ) {
-        self.render_node.update(device, encoder, 0, &light.into());
+        let light_space_matrix: LightSpaceMatrix = light.into();
+        self.render_node
+            .update(device, encoder, 0, &light_space_matrix);
     }
 }
 
