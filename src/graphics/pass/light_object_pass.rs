@@ -2,18 +2,12 @@ use std::sync::Arc;
 
 use anyhow::Result;
 use legion::prelude::*;
-use smol_renderer::{FragmentShader, RenderNode, SimpleTexture, UniformBindGroup, VertexShader};
-use wgpu::{
-    BindGroup, BindGroupLayout, BlendDescriptor, ColorStateDescriptor, ColorWrite, CommandEncoder,
-    CullMode, Device, FrontFace, IndexFormat, PipelineLayoutDescriptor, PrimitiveTopology,
-    RasterizationStateDescriptor, RenderPass, RenderPassDescriptor, RenderPipeline,
-    RenderPipelineDescriptor, TextureFormat, VertexStateDescriptor,
-};
+use smol_renderer::{FragmentShader, RenderNode, UniformBindGroup, VertexShader};
+use wgpu::{CommandEncoder, Device, RenderPassDescriptor, TextureFormat};
 
 use crate::assets::{AssetManager, ModelHandle};
 use crate::components::Transform;
 use crate::graphics::model::{DrawModel, InstanceData, MeshVertex};
-use crate::graphics::wgpu_renderer::DEPTH_FORMAT;
 use crate::graphics::{Pass, PointLight};
 
 pub struct LightObjectPass {

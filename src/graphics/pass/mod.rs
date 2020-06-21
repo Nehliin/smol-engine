@@ -1,7 +1,7 @@
 use crate::assets::AssetManager;
 use legion::prelude::World;
 use wgpu::Device;
-use wgpu::{BindGroup, CommandEncoder, RenderPass, VertexBufferDescriptor, RenderPassDescriptor};
+use wgpu::{CommandEncoder, RenderPassDescriptor};
 
 pub mod light_object_pass;
 pub mod model_pass;

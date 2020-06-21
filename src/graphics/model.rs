@@ -1,7 +1,5 @@
 use anyhow::Result;
 use nalgebra::{Matrix4, Vector3};
-use once_cell::sync::OnceCell;
-use smol_renderer::Texture;
 use smol_renderer::{
     GpuData, ImmutableVertexData, LoadableTexture, MutableVertexData, RenderNodeRunner,
     SimpleTexture, TextureData, VertexBuffer,
