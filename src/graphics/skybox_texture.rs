@@ -1,6 +1,7 @@
 use anyhow::{anyhow, Context, Result};
 use image::{DynamicImage, GenericImage};
 use once_cell::sync::OnceCell;
+use smol_renderer::{LoadableTexture, RenderError, TextureData, TextureShaderLayout};
 use std::path::Path;
 use wgpu::{
     AddressMode, BindGroup, BindGroupDescriptor, BindGroupLayout, BindGroupLayoutDescriptor,
@@ -20,8 +21,39 @@ pub struct SkyboxTexture {
     pub bind_group: BindGroup, // the texture is the buffer in this case
 }
 
-impl SkyboxTexture {
-    pub fn load(device: &Device, dir_path: impl AsRef<Path>) -> Result<(Self, CommandBuffer)> {
+impl TextureShaderLayout for SkyboxTexture {
+    const VISIBILITY: ShaderStage = ShaderStage::FRAGMENT;
+    fn get_layout(device: &Device) -> &'static BindGroupLayout {
+        static LAYOUT: OnceCell<BindGroupLayout> = OnceCell::new();
+        LAYOUT.get_or_init(|| {
+            device.create_bind_group_layout(&BindGroupLayoutDescriptor {
+                bindings: &[
+                    BindGroupLayoutEntry {
+                        binding: 0,
+                        visibility: Self::VISIBILITY,
+                        ty: BindingType::SampledTexture {
+                            multisampled: false,
+                            dimension: TextureViewDimension::Cube,
+                            component_type: TextureComponentType::Float,
+                        },
+                    },
+                    BindGroupLayoutEntry {
+                        binding: 1,
+                        visibility: Self::VISIBILITY,
+                        ty: BindingType::Sampler { comparison: true },
+                    },
+                ],
+                label: Some("Skybox Texture layout"),
+            })
+        })
+    }
+}
+
+impl LoadableTexture for SkyboxTexture {
+    fn load_texture(
+        device: &Device,
+        path: impl AsRef<Path>,
+    ) -> Result<(TextureData<Self>, CommandBuffer), RenderError> {
         let directory_iterator = std::fs::read_dir(dir_path.as_ref())
             .with_context(|| "Skybox images must be in a separate directory")?;
 
@@ -84,41 +116,18 @@ impl SkyboxTexture {
         let bind_group = Self::create_bind_group(device, &texture_view, &sampler);
 
         Ok((
-            Self {
+            TextureDat::new(
                 sampler,
                 texture,
                 texture_view,
                 bind_group,
-            },
+            ),
             command_encoder.finish(),
         ))
     }
+}
 
-    pub fn get_bind_group_layout(device: &Device) -> &BindGroupLayout {
-        static LAYOUT: OnceCell<BindGroupLayout> = OnceCell::new();
-        LAYOUT.get_or_init(|| {
-            device.create_bind_group_layout(&BindGroupLayoutDescriptor {
-                bindings: &[
-                    BindGroupLayoutEntry {
-                        binding: 0,
-                        visibility: ShaderStage::FRAGMENT,
-                        ty: BindingType::SampledTexture {
-                            multisampled: false,
-                            dimension: TextureViewDimension::Cube,
-                            component_type: TextureComponentType::Float,
-                        },
-                    },
-                    BindGroupLayoutEntry {
-                        binding: 1,
-                        visibility: ShaderStage::FRAGMENT,
-                        ty: BindingType::Sampler { comparison: true },
-                    },
-                ],
-                label: Some("Skybox Texture layout"),
-            })
-        })
-    }
-
+impl SkyboxTexture {
     fn create_texture_data(
         device: &Device,
         texture_extent: Extent3d,
