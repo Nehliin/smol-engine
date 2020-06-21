@@ -13,7 +13,7 @@ use anyhow::Result;
 use legion::prelude::World;
 use legion::prelude::*;
 use smol_renderer::{
-    FragmentShader, RenderNode, Texture, TextureData, UniformBindGroup, VertexShader,
+    FragmentShader, GpuData, RenderNode, TextureData, UniformBindGroup, VertexShader,
 };
 use std::{collections::HashMap, rc::Rc, sync::Arc};
 use wgpu::{BindGroup, BindGroupLayout, CommandBuffer, Device, ShaderStage};
@@ -87,7 +87,7 @@ impl ShadowPass {
     }
 
     // This is very ugly it's probably better do decouple these
-    // either use events to give new lights a view immedietly 
+    // either use events to give new lights a view immedietly
     // or separate them completely in different components
     pub fn update_light_with_texture_view(&self, world: &mut World) {
         let light_query = <Write<PointLight>>::query();
@@ -95,15 +95,17 @@ impl ShadowPass {
             if light.target_view.is_some() {
                 continue;
             }
-            light.target_view = Some(self.shadow_texture.create_new_view(&wgpu::TextureViewDescriptor {
-                format: SHADOW_FORMAT,
-                dimension: wgpu::TextureViewDimension::D2,
-                aspect: wgpu::TextureAspect::DepthOnly,
-                base_mip_level: 0,
-                level_count: 1,
-                base_array_layer: i as u32,
-                array_layer_count: 1,
-            }));
+            light.target_view = Some(self.shadow_texture.create_new_view(
+                &wgpu::TextureViewDescriptor {
+                    format: SHADOW_FORMAT,
+                    dimension: wgpu::TextureViewDimension::D2,
+                    aspect: wgpu::TextureAspect::DepthOnly,
+                    base_mip_level: 0,
+                    level_count: 1,
+                    base_array_layer: i as u32,
+                    array_layer_count: 1,
+                },
+            ));
         }
     }
 

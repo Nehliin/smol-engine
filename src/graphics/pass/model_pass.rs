@@ -58,7 +58,7 @@ impl ModelPass {
             .add_texture::<SimpleTexture>()
             // shadow texture
             .add_texture::<ShadowTexture>()
-            .set_default_color_state_desc(color_format)
+            .add_default_color_state_desc(color_format)
             .set_default_depth_stencil_state()
             .set_default_rasterization_state()
             .add_shared_uniform_bind_group(global_uniforms[0])
