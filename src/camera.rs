@@ -16,9 +16,9 @@ pub struct Camera {
 #[repr(C)]
 #[derive(GpuData)]
 pub struct CameraUniform {
-    view_matrix: Matrix4<f32>,
-    projection: Matrix4<f32>,
-    view_pos: Vector3<f32>,
+    pub view_matrix: Matrix4<f32>,
+    pub projection: Matrix4<f32>,
+    pub view_pos: Vector3<f32>,
 }
 
 impl From<Camera> for CameraUniform {

@@ -5,24 +5,24 @@ use wgpu::{
     Extensions, Extent3d, LoadOp, PowerPreference, PresentMode, Queue,
     RenderPassColorAttachmentDescriptor, RenderPassDepthStencilAttachmentDescriptor,
     RenderPassDescriptor, RequestAdapterOptions, ShaderStage, StoreOp, Surface, SwapChain,
-    SwapChainDescriptor, Texture, TextureDimension, TextureFormat, TextureUsage, TextureView,
+    SwapChainDescriptor, TextureDimension, TextureFormat, TextureUsage, TextureView,
 };
 
 use super::{
     pass::{shadow_pass::ShadowPass, skybox_pass::SkyboxPass},
-    point_light::{PointLightRaw, PointLightUniform},
+    point_light::PointLightRaw,
     skybox_texture::SkyboxTexture,
     PointLight,
 };
 use crate::assets::AssetManager;
 use crate::camera::{Camera, CameraUniform};
-use crate::graphics::model::Model;
 use crate::graphics::pass::light_object_pass::LightObjectPass;
 use crate::graphics::pass::model_pass::ModelPass;
 use crate::graphics::shadow_texture::ShadowTexture;
 use crate::{components::Transform, graphics::Pass};
 use nalgebra::Vector3;
-use smol_renderer::UniformBindGroup;
+use smol_renderer::{LoadableTexture, Texture, TextureData, UniformBindGroup};
+use std::rc::Rc;
 use std::sync::Arc;
 
 pub const DEPTH_FORMAT: wgpu::TextureFormat = wgpu::TextureFormat::Depth32Float;
@@ -55,9 +55,10 @@ pub struct WgpuRenderer {
     swap_chain: SwapChain,
     width: u32,
     height: u32,
-    global_uniforms: UniformBindGroup,
-    depth_texture: Texture,
+    global_camera_uniforms: Arc<UniformBindGroup>,
+    depth_texture: wgpu::Texture,
     depth_texture_view: TextureView,
+    shadow_texture: Rc<TextureData<ShadowTexture>>,
     model_pass: ModelPass,
     light_pass: LightObjectPass,
     skybox_pass: SkyboxPass,
@@ -111,12 +112,14 @@ impl WgpuRenderer {
         let depth_texture = create_depth_texture(&device, &swap_chain_desc);
         let depth_texture_view = depth_texture.create_default_view();
 
-        let shadow_pass =
-            ShadowPass::new(&device, vec![Arc::clone(&global_camera_uniforms)]).unwrap();
+        let shadow_texture = Rc::new(ShadowTexture::allocate_texture(&device));
+
+        let shadow_pass = ShadowPass::new(&device, shadow_texture.clone()).unwrap();
 
         let model_pass = ModelPass::new(
             &device,
             vec![Arc::clone(&global_camera_uniforms)],
+            shadow_texture.clone(),
             swap_chain_desc.format,
         )
         .unwrap();
@@ -124,21 +127,21 @@ impl WgpuRenderer {
             &device,
             vec![Arc::clone(&global_camera_uniforms)],
             swap_chain_desc.format,
-        );
+        )
+        .unwrap();
 
         // TODO: should be handled as an asset instead
-        let (skybox_texture, command_buffer) = SkyboxTexture::load(&device, "skybox").unwrap();
+        let (skybox_texture, command_buffer) =
+            SkyboxTexture::load_texture(&device, "skybox").unwrap();
         queue.submit(&[command_buffer]);
 
         let skybox_pass = SkyboxPass::new(
             &device,
-            vec![
-                SkyboxTexture::get_bind_group_layout(&device),
-                &camera_uniforms.bind_group_layout,
-            ],
+            vec![Arc::clone(&global_camera_uniforms)],
             swap_chain_desc.format,
             skybox_texture,
-        );
+        )
+        .unwrap();
 
         WgpuRenderer {
             surface,
@@ -153,7 +156,8 @@ impl WgpuRenderer {
             model_pass,
             light_pass,
             skybox_pass,
-            global_uniforms,
+            global_camera_uniforms,
+            shadow_texture,
             shadow_pass,
         }
     }
@@ -174,16 +178,17 @@ impl WgpuRenderer {
     }
 
     fn update_camera_uniforms(&mut self, camera: &Camera, encoder: &mut CommandEncoder) {
-        self.camera_uniforms.update(
-            &self.device,
-            &UniformCameraData {
-                view_matrix: *camera.get_view_matrix(),
-                projection: *camera.get_projection_matrix(),
-                view_pos: camera.get_vec_position(),
-            }
-            .into(),
-            encoder,
-        )
+        self.global_camera_uniforms
+            .update_buffer_data(
+                &self.device,
+                encoder,
+                &CameraUniform {
+                    view_matrix: *camera.get_view_matrix(),
+                    projection: *camera.get_projection_matrix(),
+                    view_pos: camera.get_vec_position(),
+                },
+            )
+            .unwrap();
     }
 
     // THIS SHOULD NOT REQUIRE MUTABLE REF TO RESOURCES!
@@ -193,35 +198,46 @@ impl WgpuRenderer {
         let mut encoder = self
             .device
             .create_command_encoder(&CommandEncoderDescriptor {
-                label: Some("Model render pass"),
+                label: Some("Main CommandEncoder"),
             });
         self.update_camera_uniforms(&camera, &mut encoder);
-        self.update_lights(world, &mut encoder);
         let mut asset_storage = resources.get_mut::<AssetManager>().unwrap();
         // TODO: This should be in an update method instead
         let mut commands = asset_storage.clear_load_queue(&self.device);
         self.model_pass
             .update_uniform_data(&world, &asset_storage, &self.device, &mut encoder);
+
         // move somewhere else this isn't as nice
-        self.shadow_pass
-            .shadow_texture
-            .update_lights_with_texture_view(world);
+        self.shadow_pass.update_lights_with_texture_view(world);
         let query = <(Read<PointLight>, Read<Transform>)>::query();
         for (light, transform) in query.iter(world) {
             let raw_light = PointLightRaw::from((&*light, transform.translation()));
             self.shadow_pass
                 .update_uniforms(&self.device, &raw_light, &mut encoder);
             self.shadow_pass.render(
-                // This shit doesn't work for some reaso
-                &mut encoder,
-                &[&self.camera_uniforms.bind_group],
-                &light,
-                world,
                 &asset_storage,
+                world,
+                &mut encoder,
+                RenderPassDescriptor {
+                    color_attachments: &[],
+                    depth_stencil_attachment: Some(RenderPassDepthStencilAttachmentDescriptor {
+                        attachment: light.target_view.as_ref().unwrap(),
+                        depth_load_op: LoadOp::Clear,
+                        depth_store_op: StoreOp::Store,
+                        clear_depth: 1.0,
+                        stencil_load_op: LoadOp::Clear,
+                        stencil_store_op: StoreOp::Store,
+                        clear_stencil: 0,
+                    }),
+                },
             );
         }
-        {
-            let mut render_pass = encoder.begin_render_pass(&RenderPassDescriptor {
+
+        self.skybox_pass.render(
+            &asset_storage,
+            world,
+            &mut encoder,
+            RenderPassDescriptor {
                 color_attachments: &[RenderPassColorAttachmentDescriptor {
                     attachment: &frame.view,
                     resolve_target: None,
@@ -235,17 +251,14 @@ impl WgpuRenderer {
                     },
                 }],
                 depth_stencil_attachment: None,
-            });
-            self.skybox_pass.render(
-                &[&self.camera_uniforms.bind_group],
-                &asset_storage,
-                world,
-                &mut render_pass,
-            );
-        }
+            },
+        );
 
-        {
-            let mut render_pass = encoder.begin_render_pass(&RenderPassDescriptor {
+        self.model_pass.render(
+            &asset_storage,
+            world,
+            &mut encoder,
+            RenderPassDescriptor {
                 color_attachments: &[RenderPassColorAttachmentDescriptor {
                     attachment: &frame.view,
                     resolve_target: None,
@@ -267,20 +280,13 @@ impl WgpuRenderer {
                     stencil_store_op: StoreOp::Store,
                     clear_stencil: 0,
                 }),
-            });
-            self.model_pass.render(
-                &[
-                    &self.camera_uniforms.bind_group,
-                    &self.light_uniforms.bind_group,
-                    &self.shadow_pass.shadow_texture.bind_group,
-                ],
-                &asset_storage,
-                world,
-                &mut render_pass,
-            );
-        }
-        {
-            let mut render_pass = encoder.begin_render_pass(&RenderPassDescriptor {
+            },
+        );
+        self.light_pass.render(
+            &asset_storage,
+            world,
+            &mut encoder,
+            RenderPassDescriptor {
                 color_attachments: &[RenderPassColorAttachmentDescriptor {
                     attachment: &frame.view,
                     resolve_target: None,
@@ -302,14 +308,8 @@ impl WgpuRenderer {
                     stencil_store_op: StoreOp::Store,
                     clear_stencil: 0,
                 }),
-            });
-            self.light_pass.render(
-                &[&self.camera_uniforms.bind_group],
-                &asset_storage,
-                world,
-                &mut render_pass,
-            );
-        }
+            },
+        );
         commands.push(encoder.finish());
         self.queue.submit(&commands);
     }

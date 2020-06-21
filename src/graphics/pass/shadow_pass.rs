@@ -89,7 +89,7 @@ impl ShadowPass {
     // This is very ugly it's probably better do decouple these
     // either use events to give new lights a view immedietly
     // or separate them completely in different components
-    pub fn update_light_with_texture_view(&self, world: &mut World) {
+    pub fn update_lights_with_texture_view(&self, world: &mut World) {
         let light_query = <Write<PointLight>>::query();
         for (i, mut light) in light_query.iter_mut(world).enumerate() {
             if light.target_view.is_some() {
@@ -117,17 +117,18 @@ impl ShadowPass {
     ) {
         let light_space_matrix: LightSpaceMatrix = light.into();
         self.render_node
-            .update(device, encoder, 0, &light_space_matrix);
+            .update(device, encoder, 0, &light_space_matrix)
+            .unwrap();
     }
 }
 
 impl Pass for ShadowPass {
     fn update_uniform_data(
         &self,
-        world: &World,
-        asset_manager: &AssetManager,
-        device: &Device,
-        encoder: &mut wgpu::CommandEncoder,
+        _world: &World,
+        _asset_manager: &AssetManager,
+        _device: &Device,
+        _encoder: &mut wgpu::CommandEncoder,
     ) {
         todo!("Not used but should be")
     }
