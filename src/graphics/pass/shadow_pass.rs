@@ -55,8 +55,6 @@ impl ShadowPass {
                 device,
                 "src/shader_files/fs_shadow.shader",
             )?)
-            // shadow texture
-            .add_texture::<ShadowTexture>()
             .set_depth_stencil_state(wgpu::DepthStencilStateDescriptor {
                 format: SHADOW_FORMAT,
                 depth_write_enabled: true,

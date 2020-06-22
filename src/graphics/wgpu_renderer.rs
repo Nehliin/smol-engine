@@ -85,7 +85,7 @@ impl WgpuRenderer {
                 extensions: Extensions {
                     anisotropic_filtering: false,
                 },
-                limits: Default::default(),
+                limits: wgpu::Limits { max_bind_groups: 6 },
             })
             .await;
 
@@ -208,7 +208,7 @@ impl WgpuRenderer {
             .update_uniform_data(&world, &asset_storage, &self.device, &mut encoder);
 
         // move somewhere else this isn't as nice
-        self.shadow_pass.update_lights_with_texture_view(world);
+       /* self.shadow_pass.update_lights_with_texture_view(world);
         let query = <(Read<PointLight>, Read<Transform>)>::query();
         for (light, transform) in query.iter(world) {
             let raw_light = PointLightRaw::from((&*light, transform.translation()));
@@ -231,7 +231,7 @@ impl WgpuRenderer {
                     }),
                 },
             );
-        }
+        }*/
 
         self.skybox_pass.render(
             &asset_storage,

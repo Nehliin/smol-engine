@@ -98,7 +98,7 @@ impl ModelPass {
             self.render_node.update(
                 device,
                 encoder,
-                1,
+                0,
                 &PointLightsUniforms {
                     lights_used,
                     _pad: [0; 3],
