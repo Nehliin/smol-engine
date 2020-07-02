@@ -1,12 +1,12 @@
+use super::pass::model_pass::MAX_POINT_LIGHTS;
 use once_cell::sync::OnceCell;
 use smol_renderer::textures::*;
-use super::pass::model_pass::MAX_POINT_LIGHTS;
 
 pub const SHADOW_FORMAT: wgpu::TextureFormat = wgpu::TextureFormat::Depth32Float;
 pub const SHADOW_SIZE: wgpu::Extent3d = wgpu::Extent3d {
     width: 2048,
     height: 2048,
-    depth: 1,
+    depth: MAX_POINT_LIGHTS,
 };
 
 pub struct ShadowTexture;
@@ -19,20 +19,20 @@ impl TextureShaderLayout for ShadowTexture {
         LAYOUT.get_or_init(|| {
             device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
                 bindings: &[
-                    wgpu::BindGroupLayoutEntry {
-                        binding: 0,
-                        visibility: Self::VISIBILITY,
-                        ty: wgpu::BindingType::SampledTexture {
+                    wgpu::BindGroupLayoutEntry::new(
+                        0,
+                        Self::VISIBILITY,
+                        wgpu::BindingType::SampledTexture {
                             multisampled: false,
                             dimension: wgpu::TextureViewDimension::D2Array,
                             component_type: wgpu::TextureComponentType::Float,
                         },
-                    },
-                    wgpu::BindGroupLayoutEntry {
-                        binding: 1,
-                        visibility: Self::VISIBILITY,
-                        ty: wgpu::BindingType::Sampler { comparison: true },
-                    },
+                    ),
+                    wgpu::BindGroupLayoutEntry::new(
+                        1,
+                        Self::VISIBILITY,
+                        wgpu::BindingType::Sampler { comparison: true },
+                    ),
                 ],
                 label: Some("Shadow Texture layout"),
             })
@@ -46,7 +46,6 @@ impl Texture for ShadowTexture {
         let texture = device.create_texture(&wgpu::TextureDescriptor {
             label: Some("Shadow map texture"),
             size: SHADOW_SIZE,
-            array_layer_count: MAX_POINT_LIGHTS,
             mip_level_count: 1,
             sample_count: 1,
             dimension: wgpu::TextureDimension::D2, // create cube texture for omnidirectional shadows
@@ -55,6 +54,7 @@ impl Texture for ShadowTexture {
         });
         let view = texture.create_default_view();
         let sampler = device.create_sampler(&wgpu::SamplerDescriptor {
+            label: Some("Shadow sampler"),
             address_mode_u: wgpu::AddressMode::ClampToEdge,
             address_mode_v: wgpu::AddressMode::ClampToEdge,
             address_mode_w: wgpu::AddressMode::ClampToEdge,
@@ -63,7 +63,8 @@ impl Texture for ShadowTexture {
             mipmap_filter: wgpu::FilterMode::Nearest,
             lod_min_clamp: -100.0,
             lod_max_clamp: 100.0,
-            compare: wgpu::CompareFunction::LessEqual,
+            compare: Some(wgpu::CompareFunction::LessEqual),
+            ..Default::default()
         });
 
         let bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
