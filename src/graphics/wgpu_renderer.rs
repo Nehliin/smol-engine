@@ -213,7 +213,7 @@ impl WgpuRenderer {
         self.update_camera_uniforms(&camera, &mut encoder);
         let mut asset_storage = resources.get_mut::<AssetManager>().unwrap();
         // TODO: This should be in an update method instead
-        let mut commands = asset_storage.clear_load_queue(&self.device);
+        asset_storage.clear_load_queue(&self.device, &self.queue);
         self.model_pass
             .update_uniform_data(&world, &asset_storage, &self.device, &mut encoder);
 
@@ -310,7 +310,5 @@ impl WgpuRenderer {
                 }),
             },
         );
-        commands.push(encoder.finish());
-        self.queue.submit(commands);
     }
 }

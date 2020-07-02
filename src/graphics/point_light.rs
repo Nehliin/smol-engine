@@ -5,7 +5,6 @@ use once_cell::sync::Lazy;
 static DIRECTIONAL_PROJECTION: Lazy<Orthographic3<f32>> =
     Lazy::new(|| Orthographic3::new(-10.0, 10.0, -10.0, 10.0, 1.0, 100.0));
 
-#[derive(Debug)]
 pub struct PointLight {
     pub ambient: Vector3<f32>,
     pub specular: Vector3<f32>,

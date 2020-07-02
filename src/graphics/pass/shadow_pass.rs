@@ -102,6 +102,7 @@ impl ShadowPass {
                     level_count: 1,
                     base_array_layer: i as u32,
                     array_layer_count: 1,
+                    label: Some("Light target view"),
                 },
             ));
         }
