@@ -22,15 +22,15 @@ jemallocator = "0.3"
 nalgebra = "0.21"
 thiserror = "1.0"
 ncollide3d = "0.23"
-nphysics3d = "0.15"
+nphysics3d = "0.16"
 once_cell = "1.4"
-wgpu = "0.5"
+wgpu = {git = "https://github.com/gfx-rs/wgpu-rs", features = ["trace"]}
 glsl-to-spirv = "0.1"
 anyhow = "1.0"
-glfw = "0.37"
+glfw = "0.39"
 image = "0.19"
 tobj = "2.0"
 futures = "0.3"
 smol-renderer = {path = "../smol-renderer"}
-legion =  {git = "https://github.com/TomGillen/legion.git"}
+legion =  {git = "https://github.com/TomGillen/legion.git", rev = "e2c7363e"}
 

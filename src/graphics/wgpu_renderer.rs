@@ -1,10 +1,10 @@
 use glfw::Window;
 use legion::prelude::*;
 use wgpu::{
-    Adapter, BackendBit, Color, CommandEncoder, CommandEncoderDescriptor, Device, DeviceDescriptor,
-    Extensions, Extent3d, LoadOp, PowerPreference, PresentMode, Queue,
+    BackendBit, CommandEncoder, CommandEncoderDescriptor, Device, DeviceDescriptor, Extent3d,
+    Instance, Limits, LoadOp, Operations, PowerPreference, PresentMode, Queue,
     RenderPassColorAttachmentDescriptor, RenderPassDepthStencilAttachmentDescriptor,
-    RenderPassDescriptor, RequestAdapterOptions, ShaderStage, StoreOp, Surface, SwapChain,
+    RenderPassDescriptor, RequestAdapterOptions, ShaderStage, Surface, SwapChain,
     SwapChainDescriptor, TextureDimension, TextureFormat, TextureUsage, TextureView,
 };
 
@@ -20,7 +20,6 @@ use crate::graphics::pass::light_object_pass::LightObjectPass;
 use crate::graphics::pass::model_pass::ModelPass;
 use crate::graphics::shadow_texture::ShadowTexture;
 use crate::{components::Transform, graphics::Pass};
-use nalgebra::Vector3;
 use smol_renderer::{LoadableTexture, Texture, TextureData, UniformBindGroup};
 use std::rc::Rc;
 use std::sync::Arc;
@@ -37,7 +36,6 @@ fn create_depth_texture(
             height: sc_desc.height,
             depth: 1,
         },
-        array_layer_count: 1,
         mip_level_count: 1,
         sample_count: 1,
         dimension: TextureDimension::D2,
@@ -69,25 +67,39 @@ impl WgpuRenderer {
     pub async fn new(window: &Window) -> Self {
         let (width, height) = window.get_size();
 
-        let surface = Surface::create(window);
-        let adapter = Adapter::request(
-            &RequestAdapterOptions {
-                power_preference: PowerPreference::HighPerformance,
-                compatible_surface: Some(&surface),
-            },
-            BackendBit::PRIMARY,
-        )
-        .await
-        .expect("Couldn't create wgpu adapter");
+        let instance = Instance::new(BackendBit::PRIMARY);
+
+        let surface = unsafe { instance.create_surface(window) };
+
+        let unsafe_features = wgpu::UnsafeFeatures::disallow();
+
+        let adapter = instance
+            .request_adapter(
+                &RequestAdapterOptions {
+                    power_preference: PowerPreference::HighPerformance,
+                    compatible_surface: Some(&surface),
+                },
+                unsafe_features,
+            )
+            .await
+            .expect("Failed to request adapter");
+
+        let features = adapter.features();
+        let mut limits = Limits::default();
+        limits.max_bind_groups = 6;
 
         let (device, queue) = adapter
-            .request_device(&DeviceDescriptor {
-                extensions: Extensions {
-                    anisotropic_filtering: false,
+            .request_device(
+                &DeviceDescriptor {
+                    features,
+                    shader_validation: true,
+                    limits,
                 },
-                limits: wgpu::Limits { max_bind_groups: 6 },
-            })
-            .await;
+                // TODO: set actual trace path here
+                None,
+            )
+            .await
+            .expect("Your Gpu doesn't support this program :(");
 
         let swap_chain_desc = SwapChainDescriptor {
             usage: TextureUsage::OUTPUT_ATTACHMENT,
@@ -131,9 +143,7 @@ impl WgpuRenderer {
         .unwrap();
 
         // TODO: should be handled as an asset instead
-        let (skybox_texture, command_buffer) =
-            SkyboxTexture::load_texture(&device, "skybox").unwrap();
-        queue.submit(&[command_buffer]);
+        let skybox_texture = SkyboxTexture::load_texture(&device, &queue, "skybox").unwrap();
 
         let skybox_pass = SkyboxPass::new(
             &device,
@@ -193,7 +203,7 @@ impl WgpuRenderer {
 
     // THIS SHOULD NOT REQUIRE MUTABLE REF TO RESOURCES!
     pub fn render_frame(&mut self, world: &mut World, resources: &mut Resources) {
-        let frame = self.swap_chain.get_next_texture().unwrap();
+        let frame = self.swap_chain.get_next_frame().unwrap().output;
         let camera = resources.get::<Camera>().unwrap();
         let mut encoder = self
             .device
@@ -208,7 +218,7 @@ impl WgpuRenderer {
             .update_uniform_data(&world, &asset_storage, &self.device, &mut encoder);
 
         // move somewhere else this isn't as nice
-       /* self.shadow_pass.update_lights_with_texture_view(world);
+        self.shadow_pass.update_lights_with_texture_view(world);
         let query = <(Read<PointLight>, Read<Transform>)>::query();
         for (light, transform) in query.iter(world) {
             let raw_light = PointLightRaw::from((&*light, transform.translation()));
@@ -222,16 +232,15 @@ impl WgpuRenderer {
                     color_attachments: &[],
                     depth_stencil_attachment: Some(RenderPassDepthStencilAttachmentDescriptor {
                         attachment: light.target_view.as_ref().unwrap(),
-                        depth_load_op: LoadOp::Clear,
-                        depth_store_op: StoreOp::Store,
-                        clear_depth: 1.0,
-                        stencil_load_op: LoadOp::Clear,
-                        stencil_store_op: StoreOp::Store,
-                        clear_stencil: 0,
+                        depth_ops: Some(Operations {
+                            load: LoadOp::Clear(1.0),
+                            store: true,
+                        }),
+                        stencil_ops: None,
                     }),
                 },
             );
-        }*/
+        }
 
         self.skybox_pass.render(
             &asset_storage,
@@ -241,13 +250,14 @@ impl WgpuRenderer {
                 color_attachments: &[RenderPassColorAttachmentDescriptor {
                     attachment: &frame.view,
                     resolve_target: None,
-                    load_op: wgpu::LoadOp::Clear,
-                    store_op: wgpu::StoreOp::Store,
-                    clear_color: wgpu::Color {
-                        r: 0.1,
-                        g: 0.2,
-                        b: 0.3,
-                        a: 1.0,
+                    ops: Operations {
+                        load: LoadOp::Clear(wgpu::Color {
+                            r: 0.1,
+                            g: 0.2,
+                            b: 0.3,
+                            a: 1.0,
+                        }),
+                        store: true,
                     },
                 }],
                 depth_stencil_attachment: None,
@@ -262,23 +272,18 @@ impl WgpuRenderer {
                 color_attachments: &[RenderPassColorAttachmentDescriptor {
                     attachment: &frame.view,
                     resolve_target: None,
-                    load_op: LoadOp::Load,
-                    store_op: StoreOp::Store,
-                    clear_color: Color {
-                        r: 0.1,
-                        g: 0.2,
-                        b: 0.3,
-                        a: 1.0,
+                    ops: Operations {
+                        load: LoadOp::Load,
+                        store: true,
                     },
                 }],
                 depth_stencil_attachment: Some(RenderPassDepthStencilAttachmentDescriptor {
                     attachment: &self.depth_texture_view,
-                    depth_load_op: LoadOp::Clear,
-                    depth_store_op: StoreOp::Store,
-                    clear_depth: 1.0,
-                    stencil_load_op: LoadOp::Clear,
-                    stencil_store_op: StoreOp::Store,
-                    clear_stencil: 0,
+                    depth_ops: Some(Operations {
+                        load: LoadOp::Clear(1.0),
+                        store: true,
+                    }),
+                    stencil_ops: None,
                 }),
             },
         );
@@ -290,27 +295,22 @@ impl WgpuRenderer {
                 color_attachments: &[RenderPassColorAttachmentDescriptor {
                     attachment: &frame.view,
                     resolve_target: None,
-                    load_op: LoadOp::Load,
-                    store_op: StoreOp::Store,
-                    clear_color: Color {
-                        r: 0.1,
-                        g: 0.2,
-                        b: 0.3,
-                        a: 1.0,
+                    ops: Operations {
+                        load: LoadOp::Load,
+                        store: true,
                     },
                 }],
                 depth_stencil_attachment: Some(RenderPassDepthStencilAttachmentDescriptor {
                     attachment: &self.depth_texture_view,
-                    depth_load_op: LoadOp::Load,
-                    depth_store_op: StoreOp::Store,
-                    clear_depth: 1.0,
-                    stencil_load_op: LoadOp::Load,
-                    stencil_store_op: StoreOp::Store,
-                    clear_stencil: 0,
+                    depth_ops: Some(Operations {
+                        load: LoadOp::Load,
+                        store: true,
+                    }),
+                    stencil_ops: None,
                 }),
             },
         );
         commands.push(encoder.finish());
-        self.queue.submit(&commands);
+        self.queue.submit(vec![commands]);
     }
 }
