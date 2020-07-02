@@ -4,11 +4,10 @@ use smol_renderer::{LoadableTexture, RenderError, TextureData, TextureShaderLayo
 use std::path::Path;
 use wgpu::{
     AddressMode, BindGroup, BindGroupDescriptor, BindGroupLayout, BindGroupLayoutDescriptor,
-    BindGroupLayoutEntry, Binding, BindingResource, BindingType, BufferCopyView, BufferUsage,
-    CommandBuffer, CommandEncoderDescriptor, CompareFunction, Device, Extent3d, FilterMode,
-    Origin3d, Sampler, ShaderStage, TextureAspect, TextureComponentType, TextureCopyView,
-    TextureDescriptor, TextureDimension, TextureFormat, TextureView, TextureViewDescriptor,
-    TextureViewDimension,
+    BindGroupLayoutEntry, Binding, BindingResource, BindingType, CommandEncoderDescriptor, Device,
+    Extent3d, FilterMode, Origin3d, Queue, Sampler, ShaderStage, TextureAspect,
+    TextureComponentType, TextureCopyView, TextureDataLayout, TextureDescriptor, TextureDimension,
+    TextureFormat, TextureView, TextureViewDescriptor, TextureViewDimension,
 };
 
 const REQUIRED_SKYBOX_TEXTURES: usize = 6;
@@ -27,20 +26,20 @@ impl TextureShaderLayout for SkyboxTexture {
         LAYOUT.get_or_init(|| {
             device.create_bind_group_layout(&BindGroupLayoutDescriptor {
                 bindings: &[
-                    BindGroupLayoutEntry {
-                        binding: 0,
-                        visibility: Self::VISIBILITY,
-                        ty: BindingType::SampledTexture {
+                    BindGroupLayoutEntry::new(
+                        0,
+                        Self::VISIBILITY,
+                        BindingType::SampledTexture {
                             multisampled: false,
                             dimension: TextureViewDimension::Cube,
                             component_type: TextureComponentType::Float,
                         },
-                    },
-                    BindGroupLayoutEntry {
-                        binding: 1,
-                        visibility: Self::VISIBILITY,
-                        ty: BindingType::Sampler { comparison: true },
-                    },
+                    ),
+                    BindGroupLayoutEntry::new(
+                        1,
+                        Self::VISIBILITY,
+                        BindingType::Sampler { comparison: true },
+                    ),
                 ],
                 label: Some("Skybox Texture layout"),
             })
@@ -51,8 +50,9 @@ impl TextureShaderLayout for SkyboxTexture {
 impl LoadableTexture for SkyboxTexture {
     fn load_texture(
         device: &Device,
+        queue: &Queue,
         dir_path: impl AsRef<Path>,
-    ) -> Result<(TextureData<Self>, CommandBuffer), RenderError> {
+    ) -> Result<TextureData<Self>, RenderError> {
         let directory_iterator = std::fs::read_dir(dir_path.as_ref())?;
 
         let mut paths = directory_iterator
@@ -77,45 +77,48 @@ impl LoadableTexture for SkyboxTexture {
 
         let (width, height) = images.first().unwrap().dimensions();
 
-        let texture_extent = Extent3d {
+        let texture_size = Extent3d {
             width,
             height,
-            depth: 1,
+            depth: REQUIRED_SKYBOX_TEXTURES as u32,
         };
 
-        let (texture, texture_view, sampler) = Self::create_texture_data(device, texture_extent);
+        let (texture, texture_view, sampler) = Self::create_texture_data(device, texture_size);
 
         let mut command_encoder =
             device.create_command_encoder(&CommandEncoderDescriptor { label: None });
 
-        images
+        let texture_copy_view = TextureCopyView {
+            texture: &texture,
+            mip_level: 0,
+            origin: Origin3d::ZERO,
+        };
+
+        let texture_data_layout = TextureDataLayout {
+            offset: 0,
+            bytes_per_row: 4 * width,
+            rows_per_image: 0,
+        };
+        let texture_data = images
             .iter()
             .map(|img| img.to_rgba())
-            .map(|buffer| device.create_buffer_with_data(&buffer.to_vec(), BufferUsage::COPY_SRC))
-            .enumerate()
-            .for_each(|(i, buffer)| {
-                command_encoder.copy_buffer_to_texture(
-                    BufferCopyView {
-                        buffer: &buffer,
-                        offset: 0,
-                        bytes_per_row: 4 * width,
-                        rows_per_image: 0,
-                    },
-                    TextureCopyView {
-                        texture: &texture,
-                        mip_level: 0,
-                        array_layer: i as u32,
-                        origin: Origin3d::ZERO,
-                    },
-                    texture_extent,
-                );
-            });
+            .flat_map(|img_buffer| img_buffer.to_vec())
+            .collect::<Vec<u8>>();
+
+        queue.write_texture(
+            texture_copy_view,
+            &texture_data,
+            texture_data_layout,
+            texture_size,
+        );
 
         let bind_group = Self::create_bind_group(device, &texture_view, &sampler);
 
-        Ok((
-            TextureData::new(bind_group, texture, vec![texture_view], sampler),
-            command_encoder.finish(),
+        Ok(TextureData::new(
+            bind_group,
+            texture,
+            vec![texture_view],
+            sampler,
         ))
     }
 }
@@ -128,7 +131,6 @@ impl SkyboxTexture {
         let texture = device.create_texture(&TextureDescriptor {
             label: Some("Skybox Texture"),
             size: texture_extent,
-            array_layer_count: REQUIRED_SKYBOX_TEXTURES as u32,
             mip_level_count: 1,
             sample_count: 1,
             dimension: TextureDimension::D2,
@@ -144,6 +146,7 @@ impl SkyboxTexture {
             level_count: 1,
             base_array_layer: 0,
             array_layer_count: REQUIRED_SKYBOX_TEXTURES as u32,
+            label: Some("Skybox texture view"),
         });
 
         let sampler = device.create_sampler(&wgpu::SamplerDescriptor {
@@ -155,7 +158,9 @@ impl SkyboxTexture {
             mipmap_filter: FilterMode::Nearest,
             lod_min_clamp: 0.0,
             lod_max_clamp: 100.0,
-            compare: CompareFunction::Undefined, //exuse me?
+            compare: None,
+            label: Some("Skybox Sampler"),
+            ..Default::default()
         });
 
         (texture, texture_view, sampler)
