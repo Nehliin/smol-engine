@@ -7,8 +7,7 @@ use smol_renderer::{
 use std::ops::Range;
 use std::path::Path;
 use wgpu::{
-    Buffer, BufferAddress, BufferUsage, CommandBuffer, Device, VertexAttributeDescriptor,
-    VertexFormat,
+    Buffer, BufferAddress, BufferUsage, Device, Queue, VertexAttributeDescriptor, VertexFormat,
 };
 
 const INDEX_BUFFER_SIZE: u64 = 16_000;
@@ -115,7 +114,7 @@ pub struct Model {
 }
 
 impl Model {
-    pub fn load(path: impl AsRef<Path>, device: &Device) -> Result<(Self, Vec<CommandBuffer>)> {
+    pub fn load(device: &Device, queue: &Queue, path: impl AsRef<Path>) -> Result<Self> {
         let (obj_models, obj_materials) = tobj::load_obj(path.as_ref(), true)?;
         let current_folder = path.as_ref().parent().unwrap_or_else(|| {
             panic!(
@@ -124,7 +123,6 @@ impl Model {
             )
         });
 
-        let mut command_buffers = Vec::with_capacity(obj_materials.len() * 2);
         let mut materials = Vec::with_capacity(obj_materials.len());
 
         for material in obj_materials {
@@ -134,17 +132,15 @@ impl Model {
             if specular_path.is_empty() {
                 specular_path = diffuse_path.clone(); // TODO: WORST HACK EVER
             }
-            let (diffuse_texture, diffuse_commands) =
-                SimpleTexture::load_texture(&device, current_folder.join(diffuse_path))?;
-            let (specular_texture, specular_command) =
-                SimpleTexture::load_texture(&device, current_folder.join(specular_path))?;
+            let diffuse_texture =
+                SimpleTexture::load_texture(&device, queue, current_folder.join(diffuse_path))?;
+            let specular_texture =
+                SimpleTexture::load_texture(&device, queue, current_folder.join(specular_path))?;
 
             materials.push(Material {
                 diffuse_texture,
                 specular_texture,
             });
-            command_buffers.push(diffuse_commands);
-            command_buffers.push(specular_command);
         }
 
         let mut meshes = Vec::new();
@@ -187,14 +183,11 @@ impl Model {
         println!("INSTANCE BUFFER LEN: {}", instance_buffer_len);
         let buffer_data = vec![InstanceData::default(); instance_buffer_len];
         let instance_buffer = VertexBuffer::allocate_mutable_buffer(device, &buffer_data);
-        Ok((
-            Model {
-                meshes,
-                materials,
-                instance_buffer,
-            },
-            command_buffers,
-        ))
+        Ok(Model {
+            meshes,
+            materials,
+            instance_buffer,
+        })
     }
 }
 // TODO: rethink if this is even needed anymore?
@@ -222,7 +215,7 @@ impl<'a, 'b> DrawModel<'b> for RenderNodeRunner<'a, 'b> {
     ) {
         self.set_vertex_buffer_data(0, &mesh.vertex_buffer);
         self.set_vertex_buffer_data(1, instance_buffer);
-        self.set_index_buffer(&mesh.index_buffer, 0, 0);
+        self.set_index_buffer(mesh.index_buffer.slice(..));
         self.set_texture_data(0, &material.diffuse_texture);
         self.set_texture_data(1, &material.specular_texture);
         self.draw_indexed(0..mesh.num_indexes, 0, instances);
@@ -233,7 +226,7 @@ impl<'a, 'b> DrawModel<'b> for RenderNodeRunner<'a, 'b> {
         for mesh in &model.meshes {
             self.set_vertex_buffer_data(0, &mesh.vertex_buffer);
             self.set_vertex_buffer_data(1, instance_buffer);
-            self.set_index_buffer(&mesh.index_buffer, 0, 0);
+            self.set_index_buffer(mesh.index_buffer.slice(..));
             self.draw_indexed(0..mesh.num_indexes, 0, instances.clone());
         }
     }
