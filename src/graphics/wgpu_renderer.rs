@@ -311,6 +311,6 @@ impl WgpuRenderer {
             },
         );
         commands.push(encoder.finish());
-        self.queue.submit(vec![commands]);
+        self.queue.submit(commands);
     }
 }
