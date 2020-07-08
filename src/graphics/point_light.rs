@@ -1,11 +1,10 @@
 use nalgebra::{Matrix4, Orthographic3, Point3, Vector3};
 use once_cell::sync::Lazy;
-use zerocopy::AsBytes;
+use smol_renderer::GpuData;
 
 static DIRECTIONAL_PROJECTION: Lazy<Orthographic3<f32>> =
     Lazy::new(|| Orthographic3::new(-10.0, 10.0, -10.0, 10.0, 1.0, 100.0));
 
-#[derive(Debug)]
 pub struct PointLight {
     pub ambient: Vector3<f32>,
     pub specular: Vector3<f32>,
@@ -17,7 +16,7 @@ pub struct PointLight {
 }
 
 #[repr(C)]
-#[derive(Copy, Clone, Debug, Default, AsBytes)]
+#[derive(Copy, Clone, Debug, Default, GpuData)]
 pub struct PointLightRaw {
     position: [f32; 3],
     _pad: f32,
@@ -32,6 +31,14 @@ pub struct PointLightRaw {
     _pad3: f32,
     _pad4: f32,
     pub light_space_matrix: [[f32; 4]; 4], //todo are these really necessary if you don't use as bytes anyways?
+}
+
+#[repr(C)]
+#[derive(GpuData)]
+pub struct PointLightUniform {
+    pub lights_used: i32,
+    pub _pad: [i32; 3],
+    pub point_lights: [PointLightRaw; 16],
 }
 
 impl From<(&PointLight, Vector3<f32>)> for PointLightRaw {

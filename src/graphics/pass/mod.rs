@@ -1,16 +1,12 @@
 use crate::assets::AssetManager;
 use legion::prelude::World;
 use wgpu::Device;
-use wgpu::{BindGroup, CommandEncoder, RenderPass, VertexBufferDescriptor};
+use wgpu::{CommandEncoder, RenderPassDescriptor};
 
 pub mod light_object_pass;
 pub mod model_pass;
 pub mod shadow_pass;
 pub mod skybox_pass;
-
-pub trait VBDesc {
-    fn desc<'a>() -> VertexBufferDescriptor<'a>;
-}
 
 pub trait Pass {
     fn update_uniform_data(
@@ -22,9 +18,9 @@ pub trait Pass {
     );
     fn render<'encoder>(
         &'encoder self,
-        global_bind_groups: &[&'encoder BindGroup],
         asset_manager: &'encoder AssetManager,
         world: &World,
-        render_pass: &mut RenderPass<'encoder>,
+        encoder: &mut CommandEncoder,
+        render_pass_descriptor: RenderPassDescriptor,
     );
 }

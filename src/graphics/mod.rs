@@ -3,21 +3,15 @@ use legion::prelude::{Resources, World};
 pub mod model;
 pub mod pass;
 pub mod point_light;
-pub mod shader;
 pub mod shadow_texture;
 pub mod skybox_texture;
-pub mod texture;
 pub mod wgpu_renderer;
-pub use shader::Shader;
-pub use shader::ShaderLoadError;
-mod uniform_bind_groups;
 
 pub use pass::Pass;
 
 pub use wgpu_renderer::WgpuRenderer;
 
 pub use point_light::PointLight;
-pub use uniform_bind_groups::{UniformBindGroup, UniformCameraData};
 //pub mod basic_renderer;
 //pub use basic_renderer::BasicRenderer;
 use glfw::{Glfw, Window};

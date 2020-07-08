@@ -3,7 +3,7 @@ use anyhow::{anyhow, Result};
 use std::collections::{HashMap, VecDeque};
 use std::ffi::OsString;
 use std::path::{Path, PathBuf};
-use wgpu::{CommandBuffer, Device};
+use wgpu::{Device, Queue};
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub struct ModelHandle {
@@ -53,26 +53,21 @@ impl AssetManager {
         load_queue: &VecDeque<PathBuf>,
         asset_map: &mut HashMap<ModelHandle, Model>,
         device: &Device,
-    ) -> Vec<CommandBuffer> {
-        load_queue
-            .iter()
-            .map(|path_buf| {
-                let (model, command_buffer) = Model::load(path_buf.as_path(), device).unwrap();
-                asset_map.insert(
-                    ModelHandle {
-                        file: path_buf.file_name().unwrap().to_os_string(),
-                    },
-                    model,
-                );
-                command_buffer
-            })
-            .flatten()
-            .collect::<Vec<CommandBuffer>>()
+        queue: &Queue,
+    ) {
+        load_queue.iter().for_each(|path_buf| {
+            let model = Model::load(device, queue, path_buf.as_path()).unwrap();
+            asset_map.insert(
+                ModelHandle {
+                    file: path_buf.file_name().unwrap().to_os_string(),
+                },
+                model,
+            );
+        });
     }
 
-    pub fn clear_load_queue(&mut self, device: &Device) -> Vec<CommandBuffer> {
-        let buffers = Self::clear_load_queue_impl(&self.load_queue, &mut self.asset_map, device);
+    pub fn clear_load_queue(&mut self, device: &Device, queue: &Queue) {
+        Self::clear_load_queue_impl(&self.load_queue, &mut self.asset_map, device, queue);
         self.load_queue.clear();
-        buffers
     }
 }

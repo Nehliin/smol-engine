@@ -129,10 +129,10 @@ impl State for BasicState {
             )],
         );*/
         let light_positions = vec![
-        //    Vector3::new(0.0, 5.0, 3.0),
+            //    Vector3::new(0.0, 5.0, 3.0),
             Vector3::new(2.0, 4.3, -3.0),
-          //  Vector3::new(1.0, 1.0, 0.0),
-           // Vector3::new(0.0, 0.0, -3.0),
+            //  Vector3::new(1.0, 1.0, 0.0),
+            // Vector3::new(0.0, 0.0, -3.0),
         ];
         world.insert(
             (light_box_handle, ()),

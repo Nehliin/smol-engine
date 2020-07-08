@@ -1,4 +1,4 @@
-use super::{Pass, VBDesc};
+use super::Pass;
 use crate::{
     assets::{AssetManager, ModelHandle},
     components::Transform,
@@ -6,15 +6,31 @@ use crate::{
         model::{DrawModel, InstanceData, MeshVertex},
         point_light::PointLightRaw,
         shadow_texture::{ShadowTexture, SHADOW_FORMAT},
-        uniform_bind_groups::LightSpaceMatrix,
-        PointLight, Shader, UniformBindGroup,
+        PointLight,
     },
 };
 use anyhow::Result;
 use legion::prelude::World;
 use legion::prelude::*;
-use std::collections::HashMap;
-use wgpu::{BindGroup, BindGroupLayout, CommandBuffer, Device};
+use smol_renderer::{
+    FragmentShader, GpuData, RenderNode, TextureData, UniformBindGroup, VertexShader,
+};
+use std::{collections::HashMap, rc::Rc};
+use wgpu::{Device, ShaderStage};
+
+#[repr(C)]
+#[derive(Default, Clone, GpuData)]
+pub struct LightSpaceMatrix {
+    pub light_space_matrix: [[f32; 4]; 4],
+}
+
+impl From<&PointLightRaw> for LightSpaceMatrix {
+    fn from(light: &PointLightRaw) -> Self {
+        LightSpaceMatrix {
+            light_space_matrix: light.light_space_matrix,
+        }
+    }
+}
 
 // TODO:
 // Sample the shadow textures in the model pass (add them as an internal the bindgroup)
@@ -22,49 +38,24 @@ use wgpu::{BindGroup, BindGroupLayout, CommandBuffer, Device};
 // Don't make the point light contian the target_view, that should be a separate component
 // Update the resize method
 pub struct ShadowPass {
-    render_pipeline: wgpu::RenderPipeline,
-    light_projection_uniforms: UniformBindGroup<LightSpaceMatrix>,
-    pub shadow_texture: ShadowTexture,
+    render_node: RenderNode,
+    shadow_texture: Rc<TextureData<ShadowTexture>>,
 }
 
 impl ShadowPass {
-    pub fn new(device: &Device, incoming_layouts: Vec<&BindGroupLayout>) -> Result<Self> {
-        let vs_shader = Shader::new(
-            &device,
-            "src/shader_files/vs_shadow.shader",
-            glsl_to_spirv::ShaderType::Vertex,
-        )?;
-        let fs_shader = Shader::new(
-            &device,
-            "src/shader_files/fs_shadow.shader",
-            glsl_to_spirv::ShaderType::Fragment,
-        )?;
-
-        let light_projection = UniformBindGroup::new(&device, wgpu::ShaderStage::VERTEX);
-        let mut bind_group_layouts = incoming_layouts;
-        bind_group_layouts.push(&light_projection.bind_group_layout);
-
-        let shadow_texture = ShadowTexture::new(device);
-
-        let render_pipeline_layout =
-            device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
-                bind_group_layouts: &bind_group_layouts,
-            });
-
-        let render_pipeline = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
-            layout: &render_pipeline_layout,
-            vertex_stage: vs_shader.get_descriptor(),
-            fragment_stage: Some(fs_shader.get_descriptor()),
-            rasterization_state: Some(wgpu::RasterizationStateDescriptor {
-                front_face: wgpu::FrontFace::Ccw,
-                cull_mode: wgpu::CullMode::Front,
-                depth_bias: 0,               // Biliniear filtering
-                depth_bias_slope_scale: 2.0,
-                depth_bias_clamp: 0.0,
-            }),
-            primitive_topology: wgpu::PrimitiveTopology::TriangleList,
-            color_states: &[],
-            depth_stencil_state: Some(wgpu::DepthStencilStateDescriptor {
+    pub fn new(device: &Device, shadow_texture: Rc<TextureData<ShadowTexture>>) -> Result<Self> {
+        let render_node = RenderNode::builder()
+            .add_vertex_buffer::<MeshVertex>()
+            .add_vertex_buffer::<InstanceData>()
+            .set_vertex_shader(VertexShader::new(
+                device,
+                "src/shader_files/vs_shadow.shader",
+            )?)
+            .set_fragment_shader(FragmentShader::new(
+                device,
+                "src/shader_files/fs_shadow.shader",
+            )?)
+            .set_depth_stencil_state(wgpu::DepthStencilStateDescriptor {
                 format: SHADOW_FORMAT,
                 depth_write_enabled: true,
                 depth_compare: wgpu::CompareFunction::LessEqual,
@@ -72,21 +63,49 @@ impl ShadowPass {
                 stencil_back: wgpu::StencilStateFaceDescriptor::IGNORE,
                 stencil_read_mask: 0,
                 stencil_write_mask: 0,
-            }),
-            vertex_state: wgpu::VertexStateDescriptor {
-                index_format: wgpu::IndexFormat::Uint32,
-                vertex_buffers: &[MeshVertex::desc(), InstanceData::desc()],
-            },
-            sample_count: 1,
-            sample_mask: !0,
-            alpha_to_coverage_enabled: false,
-        });
+            })
+            .set_rasterization_state(wgpu::RasterizationStateDescriptor {
+                front_face: wgpu::FrontFace::Ccw,
+                cull_mode: wgpu::CullMode::Front,
+                depth_bias: 0, // Biliniear filtering
+                depth_bias_slope_scale: 2.0,
+                depth_bias_clamp: 0.0,
+            })
+            .add_local_uniform_bind_group(
+                UniformBindGroup::with_name("Light space matrix")
+                    .add_binding::<LightSpaceMatrix>(ShaderStage::VERTEX)?
+                    .build(device),
+            )
+            .build(&device)?;
 
         Ok(Self {
-            render_pipeline,
-            light_projection_uniforms: light_projection,
+            render_node,
             shadow_texture,
         })
+    }
+
+    // This is very ugly it's probably better do decouple these
+    // either use events to give new lights a view immedietly
+    // or separate them completely in different components
+    pub fn update_lights_with_texture_view(&self, world: &mut World) {
+        let light_query = <Write<PointLight>>::query();
+        for (i, mut light) in light_query.iter_mut(world).enumerate() {
+            if light.target_view.is_some() {
+                continue;
+            }
+            light.target_view = Some(self.shadow_texture.create_new_view(
+                &wgpu::TextureViewDescriptor {
+                    format: SHADOW_FORMAT,
+                    dimension: wgpu::TextureViewDimension::D2,
+                    aspect: wgpu::TextureAspect::DepthOnly,
+                    base_mip_level: 0,
+                    level_count: 1,
+                    base_array_layer: i as u32,
+                    array_layer_count: 1,
+                    label: Some("Light target view"),
+                },
+            ));
+        }
     }
 
     pub fn update_uniforms(
@@ -95,37 +114,32 @@ impl ShadowPass {
         light: &PointLightRaw,
         encoder: &mut wgpu::CommandEncoder,
     ) {
-        self.light_projection_uniforms
-            .update(device, &light.into(), encoder);
+        let light_space_matrix: LightSpaceMatrix = light.into();
+        self.render_node
+            .update(device, encoder, 0, &light_space_matrix)
+            .unwrap();
+    }
+}
+
+impl Pass for ShadowPass {
+    fn update_uniform_data(
+        &self,
+        _world: &World,
+        _asset_manager: &AssetManager,
+        _device: &Device,
+        _encoder: &mut wgpu::CommandEncoder,
+    ) {
+        todo!("Not used but should be")
     }
 
-    pub fn render(
-        &self,
-        encoder: &mut wgpu::CommandEncoder,
-        global_bindgroups: &[&wgpu::BindGroup],
-        light: &PointLight,
+    fn render<'encoder>(
+        &'encoder self,
+        asset_manager: &'encoder AssetManager,
         world: &World,
-        asset_manager: &AssetManager,
+        encoder: &mut wgpu::CommandEncoder,
+        render_pass_descriptor: wgpu::RenderPassDescriptor,
     ) {
-        let mut pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
-            color_attachments: &[],
-            depth_stencil_attachment: Some(wgpu::RenderPassDepthStencilAttachmentDescriptor {
-                attachment: light.target_view.as_ref().unwrap(),
-                depth_load_op: wgpu::LoadOp::Clear,
-                depth_store_op: wgpu::StoreOp::Store,
-                clear_depth: 1.0,
-                stencil_load_op: wgpu::LoadOp::Clear,
-                stencil_store_op: wgpu::StoreOp::Store,
-                clear_stencil: 0,
-            }),
-        });
-
-        pass.set_pipeline(&self.render_pipeline);
-        // 0 = model texture bindgroup set in the draw call
-        // 1 = camera bindgroup
-        pass.set_bind_group(1, global_bindgroups[0], &[]);
-        // 2 = light projections
-        pass.set_bind_group(2, &self.light_projection_uniforms.bind_group, &[]);
+        let mut runner = self.render_node.runner(encoder, render_pass_descriptor);
 
         let mut offset_map = HashMap::new();
         let query =
@@ -137,7 +151,7 @@ impl ShadowPass {
             let transforms = chunk.components::<Transform>().unwrap();
             offset_map.insert(model.clone(), offset + transforms.len());
             let model = asset_manager.get_model(model).unwrap();
-            pass.draw_model_instanced(model, offset as u32..(offset + transforms.len()) as u32);
+            runner.draw_untextured(model, offset as u32..(offset + transforms.len()) as u32);
         }
     }
 }
