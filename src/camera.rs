@@ -23,12 +23,12 @@ pub struct CameraUniform {
 
 impl From<Camera> for CameraUniform {
     fn from(camera: Camera) -> Self {
-        assert!(std::mem::size_of::<Matrix4<f32>>() == std::mem::size_of::<[[f32;4];4]>());
-        assert!(std::mem::size_of::<Vector3<f32>>() == std::mem::size_of::<[f32;3]>());
+        assert!(std::mem::size_of::<Matrix4<f32>>() == std::mem::size_of::<[[f32; 4]; 4]>());
+        assert!(std::mem::size_of::<Vector3<f32>>() == std::mem::size_of::<[f32; 3]>());
         CameraUniform {
             view_matrix: camera.view_matrix,
             projection: *camera.get_projection_matrix(),
-            view_pos: camera.get_vec_position()
+            view_pos: camera.get_vec_position(),
         }
     }
 }

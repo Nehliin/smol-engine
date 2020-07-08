@@ -1,6 +1,6 @@
-use smol_renderer::GpuData;
 use nalgebra::{Matrix4, Orthographic3, Point3, Vector3};
 use once_cell::sync::Lazy;
+use smol_renderer::GpuData;
 
 static DIRECTIONAL_PROJECTION: Lazy<Orthographic3<f32>> =
     Lazy::new(|| Orthographic3::new(-10.0, 10.0, -10.0, 10.0, 1.0, 100.0));
@@ -38,7 +38,7 @@ pub struct PointLightRaw {
 pub struct PointLightUniform {
     pub lights_used: i32,
     pub _pad: [i32; 3],
-    pub point_lights: [PointLightRaw; 16]
+    pub point_lights: [PointLightRaw; 16],
 }
 
 impl From<(&PointLight, Vector3<f32>)> for PointLightRaw {

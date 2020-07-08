@@ -8,7 +8,6 @@ pub mod model_pass;
 pub mod shadow_pass;
 pub mod skybox_pass;
 
-
 pub trait Pass {
     fn update_uniform_data(
         &self,
@@ -23,5 +22,5 @@ pub trait Pass {
         world: &World,
         encoder: &mut CommandEncoder,
         render_pass_descriptor: RenderPassDescriptor,
-    ); 
+    );
 }
