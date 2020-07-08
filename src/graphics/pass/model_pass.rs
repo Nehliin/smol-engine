@@ -63,12 +63,12 @@ impl ModelPass {
             .add_default_color_state_desc(color_format)
             .set_default_depth_stencil_state()
             .set_default_rasterization_state()
-            .add_shared_uniform_bind_group(global_uniforms[0].clone())
             .add_local_uniform_bind_group(
-                UniformBindGroup::builder()
+                UniformBindGroup::with_name("Point light uniform")
                     .add_binding::<PointLightsUniforms>(ShaderStage::FRAGMENT)?
                     .build(device),
             )
+            .add_shared_uniform_bind_group(global_uniforms[0].clone())
             .build(&device)?;
 
         Ok(Self {
@@ -95,16 +95,12 @@ impl ModelPass {
                     uniform_data[i] = PointLightRaw::from((light, pos.translation()));
                     lights_used += 1;
                 });
-            self.render_node.update(
-                device,
-                encoder,
-                0,
-                &PointLightsUniforms {
-                    lights_used,
-                    _pad: [0; 3],
-                    lights: uniform_data,
-                },
-            ).unwrap();
+            let data = &PointLightsUniforms {
+                lights_used,
+                _pad: [0; 3],
+                lights: uniform_data,
+            };
+            self.render_node.update(device, encoder, 0, data).unwrap();
         }
     }
 }

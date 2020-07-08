@@ -72,8 +72,8 @@ impl ShadowPass {
                 depth_bias_clamp: 0.0,
             })
             .add_local_uniform_bind_group(
-                UniformBindGroup::builder()
-                    .add_binding::<LightSpaceMatrix>(ShaderStage::FRAGMENT)?
+                UniformBindGroup::with_name("Light space matrix")
+                    .add_binding::<LightSpaceMatrix>(ShaderStage::VERTEX)?
                     .build(device),
             )
             .build(&device)?;

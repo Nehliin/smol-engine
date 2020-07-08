@@ -38,7 +38,7 @@ impl TextureShaderLayout for SkyboxTexture {
                     BindGroupLayoutEntry::new(
                         1,
                         Self::VISIBILITY,
-                        BindingType::Sampler { comparison: true },
+                        BindingType::Sampler { comparison: false },
                     ),
                 ],
                 label: Some("Skybox Texture layout"),
@@ -85,33 +85,38 @@ impl LoadableTexture for SkyboxTexture {
 
         let (texture, texture_view, sampler) = Self::create_texture_data(device, texture_size);
 
-        let mut command_encoder =
-            device.create_command_encoder(&CommandEncoderDescriptor { label: None });
-
-        let texture_copy_view = TextureCopyView {
-            texture: &texture,
-            mip_level: 0,
-            origin: Origin3d::ZERO,
-        };
-
-        let texture_data_layout = TextureDataLayout {
-            offset: 0,
-            bytes_per_row: 4 * width,
-            rows_per_image: 0,
-        };
-        let texture_data = images
+        images
             .iter()
             .map(|img| img.to_rgba())
-            .flat_map(|img_buffer| img_buffer.to_vec())
-            .collect::<Vec<u8>>();
+            .map(|img_buffer| img_buffer.to_vec())
+            .enumerate()
+            .for_each(|(i, buffer)| {
+                let texture_copy_view = TextureCopyView {
+                    texture: &texture,
+                    mip_level: 0,
+                    origin: Origin3d {
+                        x: 0,
+                        y: 0,
+                        z: i as u32,
+                    },
+                };
 
-        queue.write_texture(
-            texture_copy_view,
-            &texture_data,
-            texture_data_layout,
-            texture_size,
-        );
-
+                let texture_data_layout = TextureDataLayout {
+                    offset: 0,
+                    bytes_per_row: 4 * width,
+                    rows_per_image: 0,
+                };
+                queue.write_texture(
+                    texture_copy_view,
+                    &buffer,
+                    texture_data_layout,
+                    Extent3d {
+                        width,
+                        height,
+                        depth: 1,
+                    },
+                );
+            });
         let bind_group = Self::create_bind_group(device, &texture_view, &sampler);
 
         Ok(TextureData::new(

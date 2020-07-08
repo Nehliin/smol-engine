@@ -20,8 +20,8 @@ struct PointLight {
 // handle multiple textures?
 layout(set = 0, binding = 0) uniform texture2D t_diffuse;
 layout(set = 0, binding = 1) uniform sampler s_diffuse;
-layout(set = 1, binding = 2) uniform texture2D t_specular;
-layout(set = 1, binding = 3) uniform sampler s_specular;
+layout(set = 1, binding = 0) uniform texture2D t_specular;
+layout(set = 1, binding = 1) uniform sampler s_specular;
 
 
 layout(set = 2, binding = 0) uniform texture2DArray t_shadow;

@@ -22,7 +22,7 @@ use crate::graphics::shadow_texture::ShadowTexture;
 use crate::{components::Transform, graphics::Pass};
 use smol_renderer::{LoadableTexture, Texture, TextureData, UniformBindGroup};
 use std::rc::Rc;
-use std::sync::Arc;
+use std::{path::Path, sync::Arc};
 
 pub const DEPTH_FORMAT: wgpu::TextureFormat = wgpu::TextureFormat::Depth32Float;
 fn create_depth_texture(
@@ -56,7 +56,6 @@ pub struct WgpuRenderer {
     global_camera_uniforms: Arc<UniformBindGroup>,
     depth_texture: wgpu::Texture,
     depth_texture_view: TextureView,
-    shadow_texture: Rc<TextureData<ShadowTexture>>,
     model_pass: ModelPass,
     light_pass: LightObjectPass,
     skybox_pass: SkyboxPass,
@@ -71,16 +70,11 @@ impl WgpuRenderer {
 
         let surface = unsafe { instance.create_surface(window) };
 
-        let unsafe_features = wgpu::UnsafeFeatures::disallow();
-
         let adapter = instance
-            .request_adapter(
-                &RequestAdapterOptions {
-                    power_preference: PowerPreference::HighPerformance,
-                    compatible_surface: Some(&surface),
-                },
-                unsafe_features,
-            )
+            .request_adapter(&RequestAdapterOptions {
+                power_preference: PowerPreference::HighPerformance,
+                compatible_surface: Some(&surface),
+            })
             .await
             .expect("Failed to request adapter");
 
@@ -95,7 +89,6 @@ impl WgpuRenderer {
                     shader_validation: true,
                     limits,
                 },
-                // TODO: set actual trace path here
                 None,
             )
             .await
@@ -131,7 +124,7 @@ impl WgpuRenderer {
         let model_pass = ModelPass::new(
             &device,
             vec![Arc::clone(&global_camera_uniforms)],
-            shadow_texture.clone(),
+            shadow_texture,
             swap_chain_desc.format,
         )
         .unwrap();
@@ -141,10 +134,8 @@ impl WgpuRenderer {
             swap_chain_desc.format,
         )
         .unwrap();
-
         // TODO: should be handled as an asset instead
         let skybox_texture = SkyboxTexture::load_texture(&device, &queue, "skybox").unwrap();
-
         let skybox_pass = SkyboxPass::new(
             &device,
             vec![Arc::clone(&global_camera_uniforms)],
@@ -167,7 +158,6 @@ impl WgpuRenderer {
             light_pass,
             skybox_pass,
             global_camera_uniforms,
-            shadow_texture,
             shadow_pass,
         }
     }
@@ -310,5 +300,6 @@ impl WgpuRenderer {
                 }),
             },
         );
+        self.queue.submit(vec![encoder.finish()]);
     }
 }
