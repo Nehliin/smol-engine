@@ -1,5 +1,7 @@
 #version 450
 
+#extension GL_EXT_samplerless_texture_functions : require
+
 layout(location=0) in vec2 v_tex_coords;
 layout(location=1) in vec3 normal;
 layout(location=2) in vec3 fragment_position;
@@ -40,9 +42,17 @@ float calc_shadow(int light_id, vec4 homo_coords) {
         return 0.0;
     } 
     const vec2 flip_correction = vec2(0.5, -0.5);
-    float closestDepth = texture(sampler2DArrayShadow(t_shadow, s_shadow), vec4(projCoords.xy * flip_correction + 0.5, light_id, projCoords.z));
+    // PCF for softer shadows:
+    float shadow = 0.0;
+    const vec3 texelSize = 1.0 / textureSize(t_shadow, 0);
     float currentDepth = projCoords.z;
-    return currentDepth > closestDepth ? 1.0 : 0.0;
+    for (int x = -1; x <= 1; ++x) {
+        for(int y = -1; y <= 1; ++y) {
+            float pcfDepth = texture(sampler2DArrayShadow(t_shadow, s_shadow), vec4(projCoords.xy * flip_correction + 0.5 + vec2(x, y) * texelSize.xy, light_id, projCoords.z));
+            shadow += currentDepth > pcfDepth ? 1.0 : 0.0;
+        }
+    }
+    return shadow / 9.0;
 }
 
 

@@ -31,6 +31,6 @@ glfw = "0.39"
 image = "0.19"
 tobj = "2.0"
 futures = "0.3"
-smol-renderer = {path = "../smol-renderer"}
+smol-renderer = {git = "https://github.com/Nehliin/smol-renderer.git"}
 legion =  {git = "https://github.com/TomGillen/legion.git", rev = "e2c7363e"}
 
