@@ -85,20 +85,6 @@ impl State for BasicState {
                 )
             }),
         );
-
-        let cube_positions = vec![
-            Vector3::new(0.0, -3.0, 0.0),
-            Vector3::new(2.0, 5.0, -15.0),
-            Vector3::new(-1.5, -2.2, -2.5),
-            Vector3::new(-3.8, -2.0, -12.0),
-            Vector3::new(2.4, -0.4, -3.5),
-            Vector3::new(-1.7, 3.0, -7.5),
-            Vector3::new(1.3, -2.0, -2.5),
-            Vector3::new(1.5, 2.0, -2.5),
-            Vector3::new(1.5, 0.2, -1.5),
-            Vector3::new(-1.3, 1.0, -1.5),
-        ];
-
         world.insert(
             (),
             cube_positions.iter().map(|&position| {
@@ -129,9 +115,9 @@ impl State for BasicState {
             )],
         );*/
         let light_positions = vec![
-            //    Vector3::new(0.0, 5.0, 3.0),
-            Vector3::new(2.0, 4.3, -3.0),
-            //  Vector3::new(1.0, 1.0, 0.0),
+            Vector3::new(-6.5, 0.0, -3.0),
+            //Vector3::new(-7.0, -2.5, -3.0),
+           // Vector3::new(-5.0, 1.0, 0.0),
             // Vector3::new(0.0, 0.0, -3.0),
         ];
         world.insert(
@@ -171,19 +157,39 @@ impl State for BasicState {
             ),
             Vector3::new(0.1, 10.0, 10.0),
         );
-        world.insert((cube_handle.clone(), ()), vec![(floor_transform,)]);
+
+        let roof_transform = Transform::new(
+            Isometry3::new(
+                Vector3::new(0.0, 5.0, -2.0),
+                Vector3::z() * 90.0_f32.to_radians(),
+            ),
+            Vector3::new(0.1, 10.0, 10.0),
+        );
+
+        let wall_transform = Transform::new(
+            Isometry3::new(
+                Vector3::new(-11.0, 0.0, -2.0),
+                Vector3::z() * 180.0_f32.to_radians(),
+            ),
+            Vector3::new(0.1, 10.0, 10.0),
+        );
+
+        world.insert(
+            (cube_handle.clone(), ()),
+            vec![(floor_transform,), (roof_transform,), (wall_transform,)],
+        );
 
         let cube_positions = vec![
-            Vector3::new(0.0, -3.0, 0.0),
-            Vector3::new(2.0, 5.0, -15.0),
-            Vector3::new(-1.5, -2.2, -2.5),
-            Vector3::new(-3.8, -2.0, -12.0),
-            Vector3::new(2.4, -0.4, -3.5),
-            Vector3::new(-1.7, 3.0, -7.5),
-            Vector3::new(1.3, -2.0, -2.5),
-            Vector3::new(1.5, 2.0, -2.5),
-            Vector3::new(1.5, 0.2, -1.5),
-            Vector3::new(-1.3, 1.0, -1.5),
+            Vector3::new(-9.0, -3.0, 0.0),
+            Vector3::new(-9.0, 5.0, -15.0),
+            Vector3::new(-6.5, -2.2, -3.5),
+            Vector3::new(-7.8, -2.0, -12.0),
+            Vector3::new(-2.4, -0.4, -3.5),
+            Vector3::new(-9.7, 3.0, -7.5),
+            Vector3::new(-3.5, -4.0, -2.5),
+            Vector3::new(-9.5, 2.0, -2.5),
+            Vector3::new(-3.5, 0.0, -1.5),
+            Vector3::new(-6.3, 3.0, -1.5),
         ];
 
         world.insert(

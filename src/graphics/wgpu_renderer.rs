@@ -20,9 +20,9 @@ use crate::graphics::pass::light_object_pass::LightObjectPass;
 use crate::graphics::pass::model_pass::ModelPass;
 use crate::graphics::shadow_texture::ShadowTexture;
 use crate::{components::Transform, graphics::Pass};
-use smol_renderer::{LoadableTexture, Texture, TextureData, UniformBindGroup};
+use smol_renderer::{LoadableTexture, Texture, UniformBindGroup};
 use std::rc::Rc;
-use std::{path::Path, sync::Arc};
+use std::sync::Arc;
 
 pub const DEPTH_FORMAT: wgpu::TextureFormat = wgpu::TextureFormat::Depth32Float;
 fn create_depth_texture(

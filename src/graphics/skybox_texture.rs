@@ -4,10 +4,10 @@ use smol_renderer::{LoadableTexture, RenderError, TextureData, TextureShaderLayo
 use std::path::Path;
 use wgpu::{
     AddressMode, BindGroup, BindGroupDescriptor, BindGroupLayout, BindGroupLayoutDescriptor,
-    BindGroupLayoutEntry, Binding, BindingResource, BindingType, CommandEncoderDescriptor, Device,
-    Extent3d, FilterMode, Origin3d, Queue, Sampler, ShaderStage, TextureAspect,
-    TextureComponentType, TextureCopyView, TextureDataLayout, TextureDescriptor, TextureDimension,
-    TextureFormat, TextureView, TextureViewDescriptor, TextureViewDimension,
+    BindGroupLayoutEntry, Binding, BindingResource, BindingType, Device, Extent3d, FilterMode,
+    Origin3d, Queue, Sampler, ShaderStage, TextureAspect, TextureComponentType, TextureCopyView,
+    TextureDataLayout, TextureDescriptor, TextureDimension, TextureFormat, TextureView,
+    TextureViewDescriptor, TextureViewDimension,
 };
 
 const REQUIRED_SKYBOX_TEXTURES: usize = 6;
