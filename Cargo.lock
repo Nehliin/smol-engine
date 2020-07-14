@@ -1673,6 +1673,7 @@ dependencies = [
 [[package]]
 name = "smol-renderer"
 version = "0.1.0"
+source = "git+https://github.com/Nehliin/smol-renderer.git#ca0b504551a3e781abaaf3cf02b89d4ac00354a2"
 dependencies = [
  "image",
  "once_cell",
@@ -1686,6 +1687,7 @@ dependencies = [
 [[package]]
 name = "smol_renderer_derive"
 version = "0.1.0"
+source = "git+https://github.com/Nehliin/smol-renderer.git#ca0b504551a3e781abaaf3cf02b89d4ac00354a2"
 dependencies = [
  "proc-macro-error",
  "quote 1.0.7",

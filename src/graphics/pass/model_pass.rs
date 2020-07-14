@@ -12,7 +12,7 @@ use crate::assets::{AssetManager, ModelHandle};
 use crate::graphics::Pass;
 use crate::{
     components::Transform,
-    graphics::PointLight,
+    graphics::{cube_shadow_texture::ShadowCubeTexture, PointLight},
     graphics::{model::MeshVertex, shadow_texture::ShadowTexture},
     graphics::{
         model::{DrawModel, InstanceData},
@@ -22,7 +22,7 @@ use crate::{
 
 pub struct ModelPass {
     //todo: maybe solve in another way instead of Rc (weak ptr)?
-    shadow_texture: Rc<TextureData<ShadowTexture>>,
+    shadow_texture: Rc<TextureData<ShadowCubeTexture>>,
     render_node: RenderNode,
 }
 
@@ -40,7 +40,7 @@ impl ModelPass {
     pub fn new(
         device: &Device,
         global_uniforms: Vec<Arc<UniformBindGroup>>,
-        shadow_texture: Rc<TextureData<ShadowTexture>>,
+        shadow_texture: Rc<TextureData<ShadowCubeTexture>>,
         color_format: TextureFormat,
     ) -> Result<Self> {
         let render_node = RenderNode::builder()

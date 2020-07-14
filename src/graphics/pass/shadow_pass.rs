@@ -3,9 +3,9 @@ use crate::{
     assets::{AssetManager, ModelHandle},
     components::Transform,
     graphics::{
+        cube_shadow_texture::{ShadowCubeTexture, SHADOW_FORMAT},
         model::{DrawModel, InstanceData, MeshVertex},
         point_light::PointLightRaw,
-        shadow_texture::{ShadowTexture, SHADOW_FORMAT},
         PointLight,
     },
 };
@@ -21,7 +21,7 @@ use wgpu::{Device, ShaderStage};
 #[repr(C)]
 #[derive(Default, Clone, GpuData)]
 pub struct LightSpaceMatrix {
-    pub light_space_matrix: [[f32; 4]; 4],
+    pub light_space_matrix: [[[f32; 4]; 4]; 6],
 }
 
 impl From<&PointLightRaw> for LightSpaceMatrix {
@@ -39,11 +39,14 @@ impl From<&PointLightRaw> for LightSpaceMatrix {
 // Update the resize method
 pub struct ShadowPass {
     render_node: RenderNode,
-    shadow_texture: Rc<TextureData<ShadowTexture>>,
+    shadow_texture: Rc<TextureData<ShadowCubeTexture>>,
 }
 
 impl ShadowPass {
-    pub fn new(device: &Device, shadow_texture: Rc<TextureData<ShadowTexture>>) -> Result<Self> {
+    pub fn new(
+        device: &Device,
+        shadow_texture: Rc<TextureData<ShadowCubeTexture>>,
+    ) -> Result<Self> {
         let render_node = RenderNode::builder()
             .add_vertex_buffer::<MeshVertex>()
             .add_vertex_buffer::<InstanceData>()
@@ -96,7 +99,7 @@ impl ShadowPass {
             light.target_view = Some(self.shadow_texture.create_new_view(
                 &wgpu::TextureViewDescriptor {
                     format: SHADOW_FORMAT,
-                    dimension: wgpu::TextureViewDimension::D2,
+                    dimension: wgpu::TextureViewDimension::Cube,
                     aspect: wgpu::TextureAspect::DepthOnly,
                     base_mip_level: 0,
                     level_count: 1,

@@ -12,7 +12,7 @@ use super::{
     pass::{shadow_pass::ShadowPass, skybox_pass::SkyboxPass},
     point_light::PointLightRaw,
     skybox_texture::SkyboxTexture,
-    PointLight,
+    PointLight, cube_shadow_texture::ShadowCubeTexture,
 };
 use crate::assets::AssetManager;
 use crate::camera::{Camera, CameraUniform};
@@ -117,7 +117,7 @@ impl WgpuRenderer {
         let depth_texture = create_depth_texture(&device, &swap_chain_desc);
         let depth_texture_view = depth_texture.create_default_view();
 
-        let shadow_texture = Rc::new(ShadowTexture::allocate_texture(&device));
+        let shadow_texture = Rc::new(ShadowCubeTexture::allocate_texture(&device));
 
         let shadow_pass = ShadowPass::new(&device, shadow_texture.clone()).unwrap();
 

@@ -5,6 +5,7 @@ pub mod pass;
 pub mod point_light;
 pub mod shadow_texture;
 pub mod skybox_texture;
+pub mod cube_shadow_texture;
 pub mod wgpu_renderer;
 
 pub use pass::Pass;

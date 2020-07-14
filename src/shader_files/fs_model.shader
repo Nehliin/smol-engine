@@ -36,6 +36,11 @@ layout(set=4, binding=0) uniform PointLights {
 };
 
 
+float linear_depth(float depth) {
+    float z = depth * 2.0 - 1.0;
+    return (2.0 * 0.1 * 100.0) / (100.0 + 0.1 - z * (100.0 - 0.1));
+}
+
 float calc_shadow(int light_id, vec4 homo_coords) {
     vec3 projCoords = homo_coords.xyz / homo_coords.w;
     if (projCoords.z > 1.0) {
@@ -49,6 +54,7 @@ float calc_shadow(int light_id, vec4 homo_coords) {
     for (int x = -1; x <= 1; ++x) {
         for(int y = -1; y <= 1; ++y) {
             float pcfDepth = texture(sampler2DArrayShadow(t_shadow, s_shadow), vec4(projCoords.xy * flip_correction + 0.5 + vec2(x, y) * texelSize.xy, light_id, projCoords.z));
+            //pcfDepth = linear_depth(pcfDepth);
             shadow += currentDepth > pcfDepth ? 1.0 : 0.0;
         }
     }

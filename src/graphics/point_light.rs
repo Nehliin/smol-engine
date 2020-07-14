@@ -1,9 +1,9 @@
-use nalgebra::{Matrix4, Orthographic3, Point3, Vector3};
+use nalgebra::{Matrix4, Perspective3, Point3, Vector3};
 use once_cell::sync::Lazy;
 use smol_renderer::GpuData;
 
-static DIRECTIONAL_PROJECTION: Lazy<Orthographic3<f32>> =
-    Lazy::new(|| Orthographic3::new(-10.0, 10.0, -10.0, 10.0, 1.0, 100.0));
+static PERSPECTIVE_PROJECTION: Lazy<Perspective3<f32>> =
+    Lazy::new(|| Perspective3::new(1.0, 90.0, 1.0, 100.0));
 
 pub struct PointLight {
     pub ambient: Vector3<f32>,
@@ -30,7 +30,7 @@ pub struct PointLightRaw {
     quadratic: f32,
     _pad3: f32,
     _pad4: f32,
-    pub light_space_matrix: [[f32; 4]; 4], //todo are these really necessary if you don't use as bytes anyways?
+    pub light_space_matrix: [[[f32; 4]; 4]; 6], //todo are these really necessary if you don't use as bytes anyways?
 }
 
 #[repr(C)]
@@ -41,20 +41,31 @@ pub struct PointLightUniform {
     pub point_lights: [PointLightRaw; 16],
 }
 
+//fn calc_light_space_matrix(direction: Point3<f32>, ) -> [f32; 4] {}
+
 impl From<(&PointLight, Vector3<f32>)> for PointLightRaw {
     fn from((light, position): (&PointLight, Vector3<f32>)) -> Self {
-        let view = Matrix4::look_at_rh(
-            &Point3::new(position.x, position.y, position.z),
-            &Point3::new(0.0, 0.0, 0.0),
-            &Vector3::y(),
-        );
-        let light_space_matrix = DIRECTIONAL_PROJECTION.to_homogeneous() * view;
-        let projection = light_space_matrix
-            .as_slice()
-            .chunks(4)
-            .map(|chunk| [chunk[0], chunk[1], chunk[2], chunk[3]])
-            .collect::<Vec<[f32; 4]>>();
+        // not very efficient
+        let calc_light_space_matrix = |direction: Vector3<f32>, up: Vector3<f32>| {
+            let light_pos = Point3::new(position.x, position.y, position.z);
+            let view = Matrix4::look_at_rh(&light_pos, &(light_pos + direction), &up);
+            let tmp = PERSPECTIVE_PROJECTION.to_homogeneous() * view;
+            let tmp = tmp
+                .as_slice()
+                .chunks(4)
+                .map(|chunk| [chunk[0], chunk[1], chunk[2], chunk[3]])
+                .collect::<Vec<[f32; 4]>>();
+            [tmp[0], tmp[1], tmp[2], tmp[3]]
+        };
 
+        let transformation: [[[f32; 4]; 4]; 6] = [
+            calc_light_space_matrix(Vector3::new(1.0, 0.0, 0.0), Vector3::new(0.0, -1.0, 0.0)),
+            calc_light_space_matrix(Vector3::new(-1.0, 0.0, 0.0), Vector3::new(0.0, -1.0, 0.0)),
+            calc_light_space_matrix(Vector3::new(0.0, 1.0, 0.0), Vector3::new(0.0, 0.0, 1.0)),
+            calc_light_space_matrix(Vector3::new(1.0, -1.0, 0.0), Vector3::new(0.0, 0.0, -1.0)),
+            calc_light_space_matrix(Vector3::new(0.0, 0.0, 1.0), Vector3::new(0.0, -1.0, 0.0)),
+            calc_light_space_matrix(Vector3::new(0.0, 0.0, -1.0), Vector3::new(0.0, -1.0, 0.0)),
+        ];
         PointLightRaw {
             position: [position.x, position.y, position.z],
             ambient: [light.ambient.x, light.ambient.y, light.ambient.z],
@@ -63,7 +74,7 @@ impl From<(&PointLight, Vector3<f32>)> for PointLightRaw {
             constant: light.constant,
             linear: light.linear,
             quadratic: light.quadratic,
-            light_space_matrix: [projection[0], projection[1], projection[2], projection[3]],
+            light_space_matrix: transformation,
             _pad: 0.0,
             _pad1: 0.0,
             _pad2: 0.0,
