@@ -765,6 +765,27 @@ dependencies = [
 ]
 
 [[package]]
+name = "imgui"
+version = "0.4.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9fdb2bcc7e498e78137ce28705ae836d69e36ee2eac89d0d926cfabfcf550570"
+dependencies = [
+ "bitflags",
+ "imgui-sys",
+ "lazy_static",
+ "parking_lot",
+]
+
+[[package]]
+name = "imgui-sys"
+version = "0.4.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "72be9671d64dd0ed26bb708cd10060a431262ac90ae70cf7c5912feefe6849da"
+dependencies = [
+ "cc",
+]
+
+[[package]]
 name = "indexmap"
 version = "1.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1658,6 +1679,7 @@ dependencies = [
  "glfw",
  "glsl-to-spirv",
  "image",
+ "imgui",
  "jemallocator",
  "legion",
  "nalgebra",
@@ -1673,6 +1695,7 @@ dependencies = [
 [[package]]
 name = "smol-renderer"
 version = "0.1.0"
+source = "git+https://github.com/Nehliin/smol-renderer.git#ca0b504551a3e781abaaf3cf02b89d4ac00354a2"
 dependencies = [
  "image",
  "once_cell",
@@ -1686,6 +1709,7 @@ dependencies = [
 [[package]]
 name = "smol_renderer_derive"
 version = "0.1.0"
+source = "git+https://github.com/Nehliin/smol-renderer.git#ca0b504551a3e781abaaf3cf02b89d4ac00354a2"
 dependencies = [
  "proc-macro-error",
  "quote 1.0.7",

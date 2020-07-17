@@ -1,4 +1,8 @@
+use super::Pass;
+use crate::assets::AssetManager;
 use anyhow::Result;
+use imgui::BackendFlags;
+use legion::prelude::World;
 use nalgebra::Vector2;
 use once_cell::sync::OnceCell;
 use smol_renderer::{
@@ -6,7 +10,8 @@ use smol_renderer::{
     TextureShaderLayout, UniformBindGroup, VertexBuffer, VertexShader,
 };
 use wgpu::{
-    BufferAddress, Device, ShaderStage, TextureFormat, VertexAttributeDescriptor, VertexFormat,
+    BufferAddress, CommandEncoder, Device, RenderPassDescriptor, ShaderStage, TextureFormat,
+    VertexAttributeDescriptor, VertexFormat,
 };
 
 #[repr(C)]
@@ -91,10 +96,7 @@ impl Texture for UiTexture {
     }
 }
 
-fn upload_font_textures(
-    fonts: &imgui::FontAtlasRefMut,
-    device: &Device,
-) -> TextureData<UiTexture> {
+fn upload_font_textures(fonts: &imgui::FontAtlasRefMut, device: &Device) -> TextureData<UiTexture> {
     let texture_atlas = fonts.build_rgba32_texture();
     let texture = device.create_texture(&wgpu::TextureDescriptor {
         label: Some("Font atlas texture"),
@@ -144,6 +146,8 @@ fn upload_font_textures(
 pub struct UiPass {
     render_node: RenderNode,
     textures: imgui::Textures<TextureData<UiTexture>>,
+    //vertex_buffer: UiVertex,
+    //index_buffer: 
 }
 
 impl UiPass {
@@ -175,8 +179,11 @@ impl UiPass {
                 depth_bias_clamp: 0.0,
             })
             .build(device)?;
+        ctx.io_mut()
+            .backend_flags
+            .insert(BackendFlags::RENDERER_HAS_VTX_OFFSET);
         let mut fonts = ctx.fonts();
-        let ui_texture = upload_font_textures(fonts, device);
+        let ui_texture = upload_font_textures(&fonts, device);
         let mut textures = imgui::Textures::new();
         let atlas = textures.insert(ui_texture);
         fonts.tex_id = atlas;
@@ -186,5 +193,105 @@ impl UiPass {
         })
     }
 
+
+    fn render<'encoder>(
+        &'encoder self,
+        device: &Device,
+        draw_data: &imgui::DrawData,
+        encoder: &mut CommandEncoder,
+        render_pass_descriptor: RenderPassDescriptor,
+    ) {
+        let runner = self.render_node.runner(encoder, render_pass_descriptor);
+        let fb_width = draw_data.display_size[0] * draw_data.framebuffer_scale[0];
+        let fb_height = draw_data.display_size[1] * draw_data.framebuffer_scale[1];
+        if !(fb_width > 0.0 && fb_height > 0.0) {
+            panic!("Wierd UI frame size");
+        }
+
+        let left = draw_data.display_pos[0];
+        let right = draw_data.display_pos[0] + draw_data.display_size[0];
+        let top = draw_data.display_pos[1];
+        let bottom = draw_data.display_pos[1] + draw_data.display_size[1];
+        let matrix = [
+            [(2.0 / (right - left)), 0.0, 0.0, 0.0],
+            [0.0, (2.0 / (top - bottom)), 0.0, 0.0],
+            [0.0, 0.0, -1.0, 0.0],
+            [
+                (right + left) / (left - right),
+                (top + bottom) / (bottom - top),
+                0.0,
+                1.0,
+            ],
+        ];
+        let clip_off = draw_data.display_pos;
+        let clip_scale = draw_data.framebuffer_scale;
+
+        // update pass data
+        upload_vertex_buffers();
+        self.render_node.update(device, encoder, 0, &ViewMatrix {matrix}).unwrap();
+
+        for cmd in draw_list.commands() {
+                match cmd {
+                    DrawCmd::Elements {
+                        count,
+                        cmd_params:
+                            DrawCmdParams {
+                                clip_rect,
+                                texture_id,
+                                vtx_offset,
+                                idx_offset,
+                                ..
+                            },
+                    } => {
+                        let clip_rect = [
+                            (clip_rect[0] - clip_off[0]) * clip_scale[0],
+                            (clip_rect[1] - clip_off[1]) * clip_scale[1],
+                            (clip_rect[2] - clip_off[0]) * clip_scale[0],
+                            (clip_rect[3] - clip_off[1]) * clip_scale[1],
+                        ];
+
+                        self.slice.start = idx_offset as u32;
+                        self.slice.end = self.slice.start + count as u32;
+                        self.slice.base_vertex = vtx_offset as u32;
+
+                        if clip_rect[0] < fb_width
+                            && clip_rect[1] < fb_height
+                            && clip_rect[2] >= 0.0
+                            && clip_rect[3] >= 0.0
+                        {
+                            let scissor = Rect {
+                                x: f32::max(0.0, clip_rect[0]).floor() as u16,
+                                y: f32::max(0.0, clip_rect[1]).floor() as u16,
+                                w: (clip_rect[2] - clip_rect[0]).abs().ceil() as u16,
+                                h: (clip_rect[3] - clip_rect[1]).abs().ceil() as u16,
+                            };
+                            let tex = self.lookup_texture(texture_id)?;
+                            #[cfg(feature = "directx")]
+                            {
+                                let constants = constants::Constants { matrix };
+                                encoder.update_constant_buffer(&self.constants, &constants);
+                            }
+                            let data = pipeline::Data {
+                                vertex_buffer: &self.vertex_buffer,
+                                #[cfg(not(feature = "directx"))]
+                                matrix: &matrix,
+                                #[cfg(feature = "directx")]
+                                constants: &self.constants,
+                                tex,
+                                scissor: &scissor,
+                                target,
+                            };
+                            encoder.draw(&self.slice, &self.pso, &data);
+                        }
+                    }
+                    DrawCmd::ResetRenderState => (), // TODO
+                    DrawCmd::RawCallback { callback, raw_cmd } => unsafe {
+                        callback(draw_list.raw(), raw_cmd)
+                    },
+                }
+            }
+        }
+
+    }
     // nextup start with rendering
 }
