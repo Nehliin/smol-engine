@@ -1,25 +1,28 @@
 use super::Pass;
 use crate::assets::AssetManager;
 use anyhow::Result;
-use imgui::BackendFlags;
+use imgui::{
+    internal::RawWrapper, BackendFlags, DrawCmd, DrawCmdParams, DrawIdx, DrawVert, TextureId,
+};
 use legion::prelude::World;
 use nalgebra::Vector2;
 use once_cell::sync::OnceCell;
 use smol_renderer::{
-    FragmentShader, GpuData, LoadableTexture, RenderNode, SimpleTexture, Texture, TextureData,
-    TextureShaderLayout, UniformBindGroup, VertexBuffer, VertexShader,
+    FragmentShader, GpuData, ImmutableVertexData, LoadableTexture, RenderNode, SimpleTexture,
+    Texture, TextureData, TextureShaderLayout, UniformBindGroup, VertexBuffer, VertexBufferData,
+    VertexShader,
 };
 use wgpu::{
-    BufferAddress, CommandEncoder, Device, RenderPassDescriptor, ShaderStage, TextureFormat,
-    VertexAttributeDescriptor, VertexFormat,
+    Buffer, BufferAddress, BufferUsage, CommandEncoder, Device, RenderPassDescriptor, ShaderStage,
+    TextureFormat, VertexAttributeDescriptor, VertexFormat,
 };
 
 #[repr(C)]
 #[derive(GpuData, Debug)]
 pub struct UiVertex {
-    position: Vector2<f32>,
-    uv: Vector2<f32>,
-    color: u32,
+    position: [f32; 2],
+    uv: [f32; 2],
+    color: [u8; 4],
 }
 
 impl VertexBuffer for UiVertex {
@@ -46,6 +49,12 @@ impl VertexBuffer for UiVertex {
     }
 }
 
+impl From<DrawVert> for UiVertex {
+    fn from(imgui_draw_vert: DrawVert) -> Self {
+        // Should be safe because of repr C and exact same layout
+        unsafe { std::mem::transmute(imgui_draw_vert) }
+    }
+}
 #[repr(C)]
 #[derive(GpuData)]
 pub struct ViewMatrix {
@@ -146,8 +155,9 @@ fn upload_font_textures(fonts: &imgui::FontAtlasRefMut, device: &Device) -> Text
 pub struct UiPass {
     render_node: RenderNode,
     textures: imgui::Textures<TextureData<UiTexture>>,
-    //vertex_buffer: UiVertex,
-    //index_buffer: 
+    font_texture: TextureData<UiTexture>,
+    vertex_buffer: Option<ImmutableVertexData<UiVertex>>,
+    index_buffer: Option<Buffer>,
 }
 
 impl UiPass {
@@ -185,17 +195,51 @@ impl UiPass {
         let mut fonts = ctx.fonts();
         let ui_texture = upload_font_textures(&fonts, device);
         let mut textures = imgui::Textures::new();
-        let atlas = textures.insert(ui_texture);
-        fonts.tex_id = atlas;
+        //let atlas = textures.insert(ui_texture);
+        //fonts.tex_id = atlas;
         Ok(UiPass {
             render_node,
+            font_texture: ui_texture,
             textures,
+            vertex_buffer: None,
+            index_buffer: None,
         })
     }
 
+    fn lookup_texture(&self, texture_id: TextureId) -> Result<&TextureData<UiTexture>, ()> {
+        if texture_id.id() == usize::MAX {
+            Ok(&self.font_texture)
+        } else if let Some(texture) = self.textures.get(texture_id) {
+            Ok(texture)
+        } else {
+            Err(())
+        }
+    }
+
+    fn upload_vertex_buffer(&mut self, device: &wgpu::Device, vtx_buffer: &[DrawVert]) {
+        // very inefficent
+        let buffer_data = vtx_buffer
+            .iter()
+            .copied()
+            .map(|vert| vert.into())
+            .collect::<Vec<UiVertex>>();
+
+        self.vertex_buffer = Some(VertexBuffer::allocate_immutable_buffer(
+            device,
+            &buffer_data,
+        ));
+    }
+
+    fn upload_index_buffer(&mut self, device: &wgpu::Device, idx_buffer: &[DrawIdx]) {
+        let data = unsafe {
+            std::slice::from_raw_parts(idx_buffer.as_ptr() as *const u8, idx_buffer.len() * 2)
+        };
+        let index_buffer = device.create_buffer_with_data(data, BufferUsage::INDEX);
+        self.index_buffer = Some(index_buffer);
+    }
 
     fn render<'encoder>(
-        &'encoder self,
+        &'encoder mut self,
         device: &Device,
         draw_data: &imgui::DrawData,
         encoder: &mut CommandEncoder,
@@ -227,10 +271,10 @@ impl UiPass {
         let clip_scale = draw_data.framebuffer_scale;
 
         // update pass data
-        upload_vertex_buffers();
-        self.render_node.update(device, encoder, 0, &ViewMatrix {matrix}).unwrap();
-
-        for cmd in draw_list.commands() {
+        for draw_list in draw_data.draw_lists() {
+            self.upload_vertex_buffer(device, draw_list.vtx_buffer());
+            self.upload_index_buffer(device, draw_list.idx_buffer());
+            for cmd in draw_list.commands() {
                 match cmd {
                     DrawCmd::Elements {
                         count,
@@ -259,29 +303,28 @@ impl UiPass {
                             && clip_rect[2] >= 0.0
                             && clip_rect[3] >= 0.0
                         {
-                            let scissor = Rect {
+                            /*let scissor = Rect {
                                 x: f32::max(0.0, clip_rect[0]).floor() as u16,
                                 y: f32::max(0.0, clip_rect[1]).floor() as u16,
                                 w: (clip_rect[2] - clip_rect[0]).abs().ceil() as u16,
                                 h: (clip_rect[3] - clip_rect[1]).abs().ceil() as u16,
-                            };
+                            };*/
                             let tex = self.lookup_texture(texture_id)?;
-                            #[cfg(feature = "directx")]
-                            {
-                                let constants = constants::Constants { matrix };
-                                encoder.update_constant_buffer(&self.constants, &constants);
-                            }
-                            let data = pipeline::Data {
-                                vertex_buffer: &self.vertex_buffer,
-                                #[cfg(not(feature = "directx"))]
-                                matrix: &matrix,
-                                #[cfg(feature = "directx")]
-                                constants: &self.constants,
-                                tex,
-                                scissor: &scissor,
-                                target,
-                            };
-                            encoder.draw(&self.slice, &self.pso, &data);
+                            // #[cfg(feature = "directx")]
+                            //{
+                            //   let constants = constants::Constants { matrix };
+                            // encoder.update_constant_buffer(&self.constants, &constants);
+                            //}
+                            self.render_node
+                                .update(device, encoder, 1, &ViewMatrix { matrix })
+                                .unwrap();
+
+                            let pass = self.render_node.runner(encoder, render_pass_descriptor);
+                            pass.set_vertex_buffer_data(0, self.vertex_buffer.unwrap());
+                            pass.set_index_buffer(self.index_buffer.unwrap().slice(..));
+                            pass.set_texture_data(0, tex);
+
+                            pass.draw_indexed(idx_offset..idx_offset + count, vtx_offset);
                         }
                     }
                     DrawCmd::ResetRenderState => (), // TODO
@@ -291,7 +334,6 @@ impl UiPass {
                 }
             }
         }
-
     }
     // nextup start with rendering
 }
