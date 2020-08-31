@@ -12,10 +12,11 @@ use std::collections::HashMap;
 
 use super::State;
 use crate::assets::AssetManager;
-use crate::graphics::PointLight;
+use crate::{graphics::PointLight, physics::Physics};
+use nphysics3d::object::BodyStatus;
 
 pub struct BasicState {
-    //  schedule: Option<Schedule>,
+    schedule: Option<Schedule>,
     first_mouse: bool,
     last_x: f32,
     last_y: f32,
@@ -25,7 +26,7 @@ pub struct BasicState {
 impl BasicState {
     pub fn new() -> Self {
         BasicState {
-            //        schedule: None,
+            schedule: None,
             first_mouse: true,
             last_y: (WINDOW_HEIGHT / 2) as f32, // TODO: ugly
             last_x: (WINDOW_WIDTH / 2) as f32,  // TODO: ugly
@@ -41,93 +42,12 @@ impl State for BasicState {
         let suit_handle = asset_manager.load_model("nanosuit/nanosuit.obj").unwrap();
         let cube_handle = asset_manager.load_model("box/cube.obj").unwrap();
         let light_box_handle = asset_manager.load_model("light/light_cube.obj").unwrap();
-        /*let physicis = Physics::new(resources);
+        drop(asset_manager);
+        let physicis = Physics::new(resources);
         let schedule = Schedule::builder().add_system(physicis.system).build();
 
         self.schedule = Some(schedule);
 
-        let light_positions = vec![
-            Vector3::new(0.7, 0.2, 2.0),
-            Vector3::new(2.3, -3.3, -4.0),
-            Vector3::new(-4.0, 2.0, -12.0),
-            Vector3::new(0.0, 0.0, -3.0),
-        ];
-
-        world.insert(
-            (), // selected
-            vec![(
-                Transform::new(
-                    Isometry3::translation(0.0, -1.75, 0.0),
-                    Vector3::new(0.2, 0.2, 0.2),
-                ),
-                Model::new("nanosuit/nanosuit.obj"),
-            )],
-        );
-
-        world.insert(
-            (LightTag, ()),
-            vec![(
-                DirectionalLight::default().set_diffuse(Vector3::new(0.0, 0.0, 1.0)),
-                (),
-            )],
-        );
-
-        world.insert(
-            (LightTag, ()), // <--- maybe shader tag here?
-            light_positions.iter().map(|&position| {
-                (
-                    Transform::new(
-                        Isometry3::translation(position.x, position.y, position.z),
-                        Vector3::new(0.5, 0.5, 0.5),
-                    ),
-                    Model::cube(),
-                    PointLight::default(),
-                )
-            }),
-        );
-
-        let cube_positions = vec![
-            Vector3::new(0.0, -3.0, 0.0),
-            Vector3::new(2.0, 5.0, -15.0),
-            Vector3::new(-1.5, -2.2, -2.5),
-            Vector3::new(-3.8, -2.0, -12.0),
-            Vector3::new(2.4, -0.4, -3.5),
-            Vector3::new(-1.7, 3.0, -7.5),
-            Vector3::new(1.3, -2.0, -2.5),
-            Vector3::new(1.5, 2.0, -2.5),
-            Vector3::new(1.5, 0.2, -1.5),
-            Vector3::new(-1.3, 1.0, -1.5),
-        ];
-
-        world.insert(
-            (),
-            cube_positions.iter().map(|&position| {
-                let transform = Transform::from_position(position);
-                (
-                    Model::cube(),
-                    Physics::create_cube(resources, &transform, BodyStatus::Dynamic),
-                    transform,
-                )
-            }),
-        );
-
-        let floor = Model::cube();
-        let floor_transform = Transform::new(
-            Isometry3::new(
-                Vector3::new(0.0, -5.0, -2.0),
-                Vector3::z() * 90.0_f32.to_radians(),
-            ),
-            Vector3::new(0.1, 10.0, 10.0),
-        );
-
-        world.insert(
-            (),
-            vec![(
-                floor,
-                Physics::create_cube(resources, &floor_transform, BodyStatus::Static),
-                floor_transform,
-            )],
-        );*/
         let light_positions = vec![
             //    Vector3::new(0.0, 5.0, 3.0),
             Vector3::new(2.0, 4.3, -3.0),
@@ -171,7 +91,13 @@ impl State for BasicState {
             ),
             Vector3::new(0.1, 10.0, 10.0),
         );
-        world.insert((cube_handle.clone(), ()), vec![(floor_transform,)]);
+        world.insert(
+            (cube_handle.clone(), ()),
+            vec![(
+                Physics::create_cube(resources, &floor_transform, BodyStatus::Static),
+                floor_transform,
+            )],
+        );
 
         let cube_positions = vec![
             Vector3::new(0.0, -3.0, 0.0),
@@ -193,16 +119,19 @@ impl State for BasicState {
                     Isometry3::translation(position.x, position.y, position.z),
                     Vector3::new(0.7, 0.7, 0.7),
                 );
-                (transform,)
+                (
+                    Physics::create_cube(resources, &transform, BodyStatus::Dynamic),
+                    transform,
+                )
             }),
         );
     }
 
-    fn update(&mut self, _world: &mut World, _resources: &mut Resources) {
-        /* self.schedule
-        .as_mut()
-        .expect("to be initializes")
-        .execute(world, resources);*/
+    fn update(&mut self, world: &mut World, resources: &mut Resources) {
+        self.schedule
+            .as_mut()
+            .expect("to be initializes")
+            .execute(world, resources);
     }
 
     fn stop(&mut self, _world: &mut World, _resources: &mut Resources) {

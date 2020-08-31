@@ -77,9 +77,9 @@ impl Physics {
         let body_handle = body_set.insert(cube_body);
 
         let shape = ShapeHandle::new(Cuboid::new(Vector3::new(
-            transform.scale.x / 2.0,
-            transform.scale.y / 2.0,
-            transform.scale.z / 2.0,
+            transform.scale.x,
+            transform.scale.y,
+            transform.scale.z,
         )));
 
         let collider = ColliderDesc::new(shape)

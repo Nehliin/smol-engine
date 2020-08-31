@@ -923,12 +923,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "libm"
-version = "0.2.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c7d73b3f436185384286bd8098d17ec07c9a7d2388a6599f824d8502b529702a"
-
-[[package]]
 name = "lock_api"
 version = "0.3.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1020,9 +1014,9 @@ dependencies = [
 
 [[package]]
 name = "nalgebra"
-version = "0.21.1"
+version = "0.22.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d6b6147c3d50b4f3cdabfe2ecc94a0191fd3d6ad58aefd9664cf396285883486"
+checksum = "4a3f0b89b0a44cb7bb9b62c5e6fd485145ddc6bc14483ab005355e96029b3fbf"
 dependencies = [
  "approx",
  "generic-array 0.13.2",
@@ -1038,9 +1032,9 @@ dependencies = [
 
 [[package]]
 name = "ncollide3d"
-version = "0.23.2"
+version = "0.24.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "bc05c110986c3e9d2028a865c8aa195739e4f720afcee2d4a3753dc11e0c4f46"
+checksum = "5d4ac20ca3005ba99e1778a36113a7d07e667cf460f0d43bb929be6f90278b27"
 dependencies = [
  "approx",
  "bitflags",
@@ -1057,9 +1051,9 @@ dependencies = [
 
 [[package]]
 name = "nphysics3d"
-version = "0.16.1"
+version = "0.17.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5761ce42fd9477707995b01b074925eafe258467b9c288d3fbe35d618588b5c1"
+checksum = "a04a5a57bd2db97e2c808f73923ded83194bcf9509e9ace618610197c13fdb14"
 dependencies = [
  "approx",
  "bitflags",
@@ -1147,7 +1141,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ac267bcc07f48ee5f8935ab0d24f316fb722d7a1292e2913f0cc196b29ffd611"
 dependencies = [
  "autocfg",
- "libm",
 ]
 
 [[package]]
@@ -1621,9 +1614,9 @@ dependencies = [
 
 [[package]]
 name = "simba"
-version = "0.1.5"
+version = "0.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "fb931b1367faadea6b1ab1c306a860ec17aaa5fa39f367d0c744e69d971a1fb2"
+checksum = "1585d831b5c904e42c4df7a4fcfa03e4b56a8cfa445aff0a04f4effe397ecac9"
 dependencies = [
  "approx",
  "num-complex",
@@ -1673,6 +1666,7 @@ dependencies = [
 [[package]]
 name = "smol-renderer"
 version = "0.1.0"
+source = "git+https://github.com/Nehliin/smol-renderer.git#3bd1bdb809f0bfecbc6ccd69f6aaecf84763e326"
 dependencies = [
  "image",
  "once_cell",
@@ -1686,6 +1680,7 @@ dependencies = [
 [[package]]
 name = "smol_renderer_derive"
 version = "0.1.0"
+source = "git+https://github.com/Nehliin/smol-renderer.git#3bd1bdb809f0bfecbc6ccd69f6aaecf84763e326"
 dependencies = [
  "proc-macro-error",
  "quote 1.0.7",

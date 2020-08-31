@@ -1,4 +1,4 @@
-use nalgebra::{Matrix4, Orthographic3, Point3, Vector3};
+use nalgebra::{geometry::Orthographic3, Matrix4, Point3, Vector3};
 use once_cell::sync::Lazy;
 use smol_renderer::GpuData;
 
