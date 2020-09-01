@@ -33,14 +33,6 @@ pub struct PointLightRaw {
     pub light_space_matrix: [[f32; 4]; 4], //todo are these really necessary if you don't use as bytes anyways?
 }
 
-#[repr(C)]
-#[derive(GpuData)]
-pub struct PointLightUniform {
-    pub lights_used: i32,
-    pub _pad: [i32; 3],
-    pub point_lights: [PointLightRaw; 16],
-}
-
 impl From<(&PointLight, Vector3<f32>)> for PointLightRaw {
     fn from((light, position): (&PointLight, Vector3<f32>)) -> Self {
         let view = Matrix4::look_at_rh(
@@ -48,6 +40,7 @@ impl From<(&PointLight, Vector3<f32>)> for PointLightRaw {
             &Point3::new(0.0, 0.0, 0.0),
             &Vector3::y(),
         );
+        // TODO: This shouldn't be Orthographic projection
         let light_space_matrix = DIRECTIONAL_PROJECTION.to_homogeneous() * view;
         let projection = light_space_matrix
             .as_slice()

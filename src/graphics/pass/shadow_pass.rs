@@ -33,8 +33,6 @@ impl From<&PointLightRaw> for LightSpaceMatrix {
 }
 
 // TODO:
-// Sample the shadow textures in the model pass (add them as an internal the bindgroup)
-// modify the model_pass shaders
 // Don't make the point light contian the target_view, that should be a separate component
 // Update the resize method
 pub struct ShadowPass {
