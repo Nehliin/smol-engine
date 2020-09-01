@@ -2,7 +2,7 @@ use nalgebra::{geometry::Orthographic3, Matrix4, Point3, Vector3};
 use once_cell::sync::Lazy;
 use smol_renderer::GpuData;
 
-static DIRECTIONAL_PROJECTION: Lazy<Orthographic3<f32>> =
+pub static DIRECTIONAL_PROJECTION: Lazy<Orthographic3<f32>> =
     Lazy::new(|| Orthographic3::new(-10.0, 10.0, -10.0, 10.0, 1.0, 100.0));
 
 pub struct PointLight {
