@@ -9,9 +9,14 @@ use wgpu::{
 };
 
 use super::{
-    pass::{shadow_pass::ShadowPass, skybox_pass::SkyboxPass},
+    pass::{
+        shadow_pass::ShadowPass,
+        skybox_pass::SkyboxPass,
+        water_pass::{WaterPass, WaterResource},
+    },
     point_light::PointLightRaw,
     skybox_texture::SkyboxTexture,
+    water_map::WaterMap,
     PointLight,
 };
 use crate::assets::AssetManager;
@@ -20,9 +25,9 @@ use crate::graphics::pass::light_object_pass::LightObjectPass;
 use crate::graphics::pass::model_pass::ModelPass;
 use crate::graphics::shadow_texture::ShadowTexture;
 use crate::{components::Transform, graphics::Pass};
-use smol_renderer::{LoadableTexture, Texture, TextureData, UniformBindGroup};
+use smol_renderer::{LoadableTexture, Texture, UniformBindGroup};
 use std::rc::Rc;
-use std::{path::Path, sync::Arc};
+use std::sync::Arc;
 
 pub const DEPTH_FORMAT: wgpu::TextureFormat = wgpu::TextureFormat::Depth32Float;
 fn create_depth_texture(
@@ -60,6 +65,7 @@ pub struct WgpuRenderer {
     light_pass: LightObjectPass,
     skybox_pass: SkyboxPass,
     shadow_pass: ShadowPass,
+    water_pass: WaterPass,
 }
 
 impl WgpuRenderer {
@@ -118,13 +124,16 @@ impl WgpuRenderer {
         let depth_texture_view = depth_texture.create_default_view();
 
         let shadow_texture = Rc::new(ShadowTexture::allocate_texture(&device));
+        let water_map = Rc::new(WaterMap::allocate_texture(&device));
 
+        let water_pass = WaterPass::new(&device, water_map.clone()).unwrap();
         let shadow_pass = ShadowPass::new(&device, shadow_texture.clone()).unwrap();
 
         let model_pass = ModelPass::new(
             &device,
             vec![Arc::clone(&global_camera_uniforms)],
             shadow_texture,
+            water_map,
             swap_chain_desc.format,
         )
         .unwrap();
@@ -159,6 +168,7 @@ impl WgpuRenderer {
             skybox_pass,
             global_camera_uniforms,
             shadow_pass,
+            water_pass,
         }
     }
 
@@ -207,6 +217,11 @@ impl WgpuRenderer {
         self.model_pass
             .update_uniform_data(&world, &asset_storage, &self.device, &mut encoder);
 
+        let water = resources.get::<WaterResource>().unwrap();
+
+        self.water_pass
+            .update_uniforms(&self.device, &water, &mut encoder);
+
         // move somewhere else this isn't as nice
         self.shadow_pass.update_lights_with_texture_view(world);
         let query = <(Read<PointLight>, Read<Transform>)>::query();
@@ -231,6 +246,23 @@ impl WgpuRenderer {
                 },
             );
         }
+
+        self.water_pass.render(
+            &asset_storage,
+            world,
+            &mut encoder,
+            RenderPassDescriptor {
+                color_attachments: &[],
+                depth_stencil_attachment: Some(RenderPassDepthStencilAttachmentDescriptor {
+                    attachment: &self.water_pass.water_map_view,
+                    depth_ops: Some(Operations {
+                        load: LoadOp::Clear(1.0),
+                        store: true,
+                    }),
+                    stencil_ops: None,
+                }),
+            },
+        );
 
         self.skybox_pass.render(
             &asset_storage,

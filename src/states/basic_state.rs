@@ -12,7 +12,10 @@ use std::collections::HashMap;
 
 use super::State;
 use crate::assets::AssetManager;
-use crate::{graphics::PointLight, physics::Physics};
+use crate::{
+    graphics::{pass::water_pass::WaterResource, PointLight},
+    physics::Physics,
+};
 use nphysics3d::object::BodyStatus;
 
 pub struct BasicState {
@@ -46,11 +49,15 @@ impl State for BasicState {
         let physicis = Physics::new(resources);
         let schedule = Schedule::builder().add_system(physicis.system).build();
 
+        let water = WaterResource { level: 3.0 };
+        
+        resources.insert(water);
+
         self.schedule = Some(schedule);
 
         let light_positions = vec![
             //    Vector3::new(0.0, 5.0, 3.0),
-            Vector3::new(2.0, 4.3, -3.0),
+            Vector3::new(2.0, 3.0, -3.0),
             //  Vector3::new(1.0, 1.0, 0.0),
             // Vector3::new(0.0, 0.0, -3.0),
         ];
