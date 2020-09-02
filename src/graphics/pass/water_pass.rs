@@ -4,19 +4,24 @@ use crate::{
     components::Transform,
     graphics::{
         model::{DrawModel, InstanceData, MeshVertex},
-        point_light::DIRECTIONAL_PROJECTION,
         water_map::{WaterMap, WATERMAP_FORMAT},
         PointLight,
     },
 };
 use anyhow::Result;
 use legion::prelude::*;
-use nalgebra::{Matrix4, Point3, Vector3};
+use nalgebra::{Matrix4, Point3, Vector3, Orthographic3};
 use smol_renderer::{
     FragmentShader, GpuData, RenderNode, TextureData, UniformBindGroup, VertexShader,
 };
 use std::{collections::HashMap, rc::Rc};
 use wgpu::{Device, ShaderStage};
+use once_cell::sync::Lazy;
+
+static ORTHOGRAPHIC_PROJECTION: Lazy<Orthographic3<f32>> =
+    Lazy::new(|| Orthographic3::new(-10.0, 10.0, -10.0, 10.0, 1.0, 100.0));
+
+
 
 // defines the water level and possibly more things in the future
 // the water map is captured looking straight down towards origin
@@ -38,8 +43,8 @@ impl From<&WaterResource> for WaterSurfaceSpaceMatrix {
             &Point3::new(0.0, 0.0, 0.0),
             &Vector3::y(),
         );
-        let water_space_matrix = DIRECTIONAL_PROJECTION.to_homogeneous() * view;
-        let projection = water_space_matrix
+        let water_space_matrix = ORTHOGRAPHIC_PROJECTION.to_homogeneous() * view;
+        let projection = dbg!(water_space_matrix)
             .as_slice()
             .chunks(4)
             .map(|chunk| [chunk[0], chunk[1], chunk[2], chunk[3]])

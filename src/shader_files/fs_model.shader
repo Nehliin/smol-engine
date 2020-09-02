@@ -29,8 +29,12 @@ layout(set = 1, binding = 1) uniform sampler s_specular;
 layout(set = 2, binding = 0) uniform texture2DArray t_shadow;
 layout(set = 2, binding = 1) uniform samplerShadow s_shadow;
 
+layout(set = 3, binding = 0) uniform texture2D t_water;
+layout(set = 3, binding = 1) uniform sampler s_water;
+
+
 const int MAX_POINT_LIGHTS = 16;
-layout(set=4, binding=0) uniform PointLights {
+layout(set=5, binding=0) uniform PointLights {
     int lights_used;
     PointLight pointLights[MAX_POINT_LIGHTS];
 };

@@ -152,6 +152,7 @@ impl Pass for ModelPass {
             .expect("Asset not registerd");
         let mut runner = self.render_node.runner(encoder, render_pass_descriptor);
         runner.set_texture_data(2, &self.shadow_texture);
+        runner.set_texture_data(3, &self.water_map);
         let mut offset_map = HashMap::new();
         let query =
             <(Read<Transform>, Tagged<Handle<Model>>)>::query().filter(!component::<PointLight>());
