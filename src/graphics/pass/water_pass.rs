@@ -4,24 +4,20 @@ use crate::{
     components::Transform,
     graphics::{
         model::{DrawModel, InstanceData, MeshVertex},
+        shadow_texture::ShadowTexture,
         water_map::{WaterMap, WATERMAP_FORMAT},
         PointLight,
     },
 };
 use anyhow::Result;
 use legion::prelude::*;
-use nalgebra::{Matrix4, Point3, Vector3, Orthographic3};
+use nalgebra::{Matrix4, Orthographic3, Point3, Vector3};
+use once_cell::sync::Lazy;
 use smol_renderer::{
     FragmentShader, GpuData, RenderNode, TextureData, UniformBindGroup, VertexShader,
 };
 use std::{collections::HashMap, rc::Rc};
 use wgpu::{Device, ShaderStage};
-use once_cell::sync::Lazy;
-
-static ORTHOGRAPHIC_PROJECTION: Lazy<Orthographic3<f32>> =
-    Lazy::new(|| Orthographic3::new(-10.0, 10.0, -10.0, 10.0, 1.0, 100.0));
-
-
 
 // defines the water level and possibly more things in the future
 // the water map is captured looking straight down towards origin
@@ -30,39 +26,19 @@ pub struct WaterResource {
     pub level: f32,
 }
 
-#[repr(C)]
-#[derive(Default, Clone, GpuData)]
-pub struct WaterSurfaceSpaceMatrix {
-    pub matrix: [[f32; 4]; 4],
-}
-
-impl From<&WaterResource> for WaterSurfaceSpaceMatrix {
-    fn from(water: &WaterResource) -> Self {
-        let view = Matrix4::look_at_rh(
-            &Point3::new(0.0, water.level, 0.0),
-            &Point3::new(0.0, 0.0, 0.0),
-            &Vector3::y(),
-        );
-        let water_space_matrix = ORTHOGRAPHIC_PROJECTION.to_homogeneous() * view;
-        let projection = dbg!(water_space_matrix)
-            .as_slice()
-            .chunks(4)
-            .map(|chunk| [chunk[0], chunk[1], chunk[2], chunk[3]])
-            .collect::<Vec<[f32; 4]>>();
-        WaterSurfaceSpaceMatrix {
-            matrix: [projection[0], projection[1], projection[1], projection[3]],
-        }
-    }
-}
-
 pub struct WaterPass {
     render_node: RenderNode,
     water_map: Rc<TextureData<WaterMap>>,
+    shadow_map: Rc<TextureData<ShadowTexture>>,
     pub water_map_view: wgpu::TextureView,
 }
 
 impl WaterPass {
-    pub fn new(device: &Device, water_map: Rc<TextureData<WaterMap>>) -> Result<WaterPass> {
+    pub fn new(
+        device: &Device,
+        shadow_map: Rc<TextureData<ShadowTexture>>,
+        water_map: Rc<TextureData<WaterMap>>,
+    ) -> Result<WaterPass> {
         let render_node = RenderNode::builder()
             .add_vertex_buffer::<MeshVertex>()
             .add_vertex_buffer::<InstanceData>()
@@ -90,11 +66,7 @@ impl WaterPass {
                 depth_bias_slope_scale: 2.0,
                 depth_bias_clamp: 0.0,
             })
-            .add_local_uniform_bind_group(
-                UniformBindGroup::with_name("Water surface matrix")
-                    .add_binding::<WaterSurfaceSpaceMatrix>(ShaderStage::VERTEX)?
-                    .build(device),
-            )
+            .add_texture::<ShadowTexture>()
             .build(&device)?;
 
         let water_map_view = water_map.create_new_view(&wgpu::TextureViewDescriptor {
@@ -111,20 +83,9 @@ impl WaterPass {
         Ok(WaterPass {
             render_node,
             water_map,
+            shadow_map,
             water_map_view,
         })
-    }
-
-    pub fn update_uniforms(
-        &self,
-        device: &Device,
-        water: &WaterResource,
-        encoder: &mut wgpu::CommandEncoder,
-    ) {
-        let water_space_matrix: WaterSurfaceSpaceMatrix = water.into();
-        self.render_node
-            .update(device, encoder, 0, &water_space_matrix)
-            .unwrap();
     }
 }
 
@@ -147,7 +108,7 @@ impl Pass for WaterPass {
         render_pass_descriptor: wgpu::RenderPassDescriptor,
     ) {
         let mut runner = self.render_node.runner(encoder, render_pass_descriptor);
-
+        runner.set_texture_data(0, &self.shadow_map);
         let mut offset_map = HashMap::new();
         let query =
             <(Read<Transform>, Tagged<ModelHandle>)>::query().filter(!component::<PointLight>());

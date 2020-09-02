@@ -126,7 +126,7 @@ impl WgpuRenderer {
         let shadow_texture = Rc::new(ShadowTexture::allocate_texture(&device));
         let water_map = Rc::new(WaterMap::allocate_texture(&device));
 
-        let water_pass = WaterPass::new(&device, water_map.clone()).unwrap();
+        let water_pass = WaterPass::new(&device, shadow_texture.clone(), water_map.clone()).unwrap();
         let shadow_pass = ShadowPass::new(&device, shadow_texture.clone()).unwrap();
 
         let model_pass = ModelPass::new(
@@ -218,9 +218,6 @@ impl WgpuRenderer {
             .update_uniform_data(&world, &asset_storage, &self.device, &mut encoder);
 
         let water = resources.get::<WaterResource>().unwrap();
-
-        self.water_pass
-            .update_uniforms(&self.device, &water, &mut encoder);
 
         // move somewhere else this isn't as nice
         self.shadow_pass.update_lights_with_texture_view(world);
