@@ -12,7 +12,7 @@ layout(location=2) out vec3 fragment_position;
 layout(location=3) out vec3 out_view_pos;
 
 
-layout(set=3, binding=0)
+layout(set=4, binding=0)
 uniform Uniforms {
     mat4 view;
     mat4 projection;
