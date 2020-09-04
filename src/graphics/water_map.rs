@@ -1,7 +1,7 @@
 use smol_renderer::{Texture, TextureShaderLayout, TextureData};
 use once_cell::sync::OnceCell;
 
-pub const WATERMAP_FORMAT: wgpu::TextureFormat = wgpu::TextureFormat::Depth32Float;
+pub const WATERMAP_FORMAT: wgpu::TextureFormat = wgpu::TextureFormat::Bgra8UnormSrgb;
 pub const WATERMAP_SIZE: wgpu::Extent3d = wgpu::Extent3d {
     width: 512,
     height: 512,
@@ -25,7 +25,7 @@ impl TextureShaderLayout for WaterMap {
                         Self::VISIBILITY,
                         wgpu::BindingType::SampledTexture {
                             multisampled: false,
-                            dimension: wgpu::TextureViewDimension::D2Array,
+                            dimension: wgpu::TextureViewDimension::D2,
                             component_type: wgpu::TextureComponentType::Float,
                         },
                     ),

@@ -9,11 +9,7 @@ use wgpu::{
 };
 
 use super::{
-    pass::{
-        shadow_pass::ShadowPass,
-        skybox_pass::SkyboxPass,
-        water_pass::{WaterPass, WaterResource},
-    },
+    pass::{shadow_pass::ShadowPass, skybox_pass::SkyboxPass, water_pass::WaterPass},
     point_light::PointLightRaw,
     skybox_texture::SkyboxTexture,
     water_map::WaterMap,
@@ -222,16 +218,44 @@ impl WgpuRenderer {
         self.model_pass
             .update_uniform_data(&world, &resources, &self.device, &mut encoder);
 
-        let water = resources.get::<WaterResource>().unwrap();
-
-        self.water_pass
-            .update_uniforms(&self.device, &water, &mut encoder);
-
         // move somewhere else this isn't as nice
         self.shadow_pass.update_lights_with_texture_view(world);
         let query = <(Read<PointLight>, Read<Transform>)>::query();
         for (light, transform) in query.iter(world) {
             let raw_light = PointLightRaw::from((&*light, transform.translation()));
+            self.water_pass
+                .update_uniforms(&self.device, &raw_light, &mut encoder);
+            self.water_pass.render(
+                &resources,
+                world,
+                &mut encoder,
+                RenderPassDescriptor {
+                    color_attachments: &[RenderPassColorAttachmentDescriptor {
+                        attachment: &self.water_pass.water_map_view,
+                        resolve_target: None,
+                        ops: Operations {
+                            // TODO: Are these sane defaults?
+                            load: LoadOp::Clear(wgpu::Color {
+                                r: 0.0,
+                                g: 0.0,
+                                b: 0.0,
+                                a: 0.0,
+                                
+                            }),
+                            store: true,
+                        },
+                    }],
+                    depth_stencil_attachment: None /*Some(RenderPassDepthStencilAttachmentDescriptor {
+                        attachment: &self.water_pass.water_map_view,
+                        depth_ops: Some(Operations {
+                            load: LoadOp::Clear(1.0),
+                            store: true,
+                        }),
+                        stencil_ops: None,
+                    })*/,
+                },
+            );
+
             self.shadow_pass
                 .update_uniforms(&self.device, &raw_light, &mut encoder);
             self.shadow_pass.render(

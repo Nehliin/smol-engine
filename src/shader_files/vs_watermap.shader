@@ -6,8 +6,11 @@ layout(location=2) in vec2 tex_coords;
 
 layout(location=3) in mat4 model;
 
-layout(set=0, binding=0) uniform WaterSurfaceSpaceMatrix {
-    mat4 matrix;
+layout(location=0) out vec4 world_pos;
+layout(location=1) out float projected_depth;
+
+layout(set=0, binding=0) uniform LightSpaceMatrix {
+    mat4 projection_matrix;
 };
 
 
@@ -18,5 +21,7 @@ const mat4 CONVERSION = mat4(
 0.0, 0.0, 0.5, 1.0);
 
 void main() {
-    gl_Position = CONVERSION * matrix *  model * vec4(a_position, 1.0);
+    world_pos =   model * vec4(a_position, 1.0);
+    projected_depth = vec4(  projection_matrix * model * vec4(a_position, 1.0)).z;
+    gl_Position = CONVERSION * projection_matrix *  model * vec4(a_position, 1.0);
 }
