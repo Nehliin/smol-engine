@@ -4,8 +4,9 @@ use crate::{
     components::Transform,
     graphics::{
         model::{DrawModel, InstanceData, MeshVertex},
-        water_map::{WaterMap, WATERMAP_FORMAT},
-        PointLight, point_light::PointLightRaw,
+        point_light::PointLightRaw,
+        water_map::{WaterEnviornmentMap, WATERMAP_FORMAT},
+        PointLight,
     },
 };
 use anyhow::Result;
@@ -16,14 +17,17 @@ use smol_renderer::{
 use std::{collections::HashMap, rc::Rc};
 use wgpu::{Device, ShaderStage};
 
-pub struct WaterPass {
+pub struct WaterEnvironmentPass {
     render_node: RenderNode,
-    water_map: Rc<TextureData<WaterMap>>,
+    water_map: Rc<TextureData<WaterEnviornmentMap>>,
     pub water_map_view: wgpu::TextureView,
 }
 
-impl WaterPass {
-    pub fn new(device: &Device, water_map: Rc<TextureData<WaterMap>>) -> Result<WaterPass> {
+impl WaterEnvironmentPass {
+    pub fn new(
+        device: &Device,
+        water_map: Rc<TextureData<WaterEnviornmentMap>>,
+    ) -> Result<WaterEnvironmentPass> {
         let render_node = RenderNode::builder()
             .add_vertex_buffer::<MeshVertex>()
             .add_vertex_buffer::<InstanceData>()
@@ -35,22 +39,8 @@ impl WaterPass {
                 device,
                 "src/shader_files/fs_watermap.shader",
             )?)
-            /*.set_depth_stencil_state(wgpu::DepthStencilStateDescriptor {
-                format: wgpu::TextureFormat::Depth32Float,
-                depth_write_enabled: true,
-                depth_compare: wgpu::CompareFunction::LessEqual,
-                stencil_front: wgpu::StencilStateFaceDescriptor::IGNORE,
-                stencil_back: wgpu::StencilStateFaceDescriptor::IGNORE,
-                stencil_read_mask: 0,
-                stencil_write_mask: 0,
-            })*/
-            .set_rasterization_state(wgpu::RasterizationStateDescriptor {
-                front_face: wgpu::FrontFace::Ccw,
-                cull_mode: wgpu::CullMode::Front,
-                depth_bias: 0,
-                depth_bias_slope_scale: 2.0,
-                depth_bias_clamp: 0.0,
-            })
+            // This previously Culled front instead of back
+            .set_default_rasterization_state()
             .add_default_color_state_desc(WATERMAP_FORMAT)
             .add_local_uniform_bind_group(
                 UniformBindGroup::with_name("Water surface matrix")
@@ -70,7 +60,7 @@ impl WaterPass {
             array_layer_count: 1,
         });
 
-        Ok(WaterPass {
+        Ok(WaterEnvironmentPass {
             render_node,
             water_map,
             water_map_view,
@@ -90,7 +80,7 @@ impl WaterPass {
     }
 }
 
-impl Pass for WaterPass {
+impl Pass for WaterEnvironmentPass {
     fn update_uniform_data(
         &self,
         _world: &World,

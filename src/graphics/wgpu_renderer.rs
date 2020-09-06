@@ -9,10 +9,13 @@ use wgpu::{
 };
 
 use super::{
-    pass::{shadow_pass::ShadowPass, skybox_pass::SkyboxPass, water_pass::WaterPass},
+    pass::{
+        shadow_pass::ShadowPass, skybox_pass::SkyboxPass,
+        water_environment_pass::WaterEnvironmentPass, water_surface_pass::WaterSurfacePass,
+    },
     point_light::PointLightRaw,
     skybox_texture::SkyboxTexture,
-    water_map::WaterMap,
+    water_map::WaterEnviornmentMap,
     PointLight,
 model::Model};
 use crate::graphics::pass::light_object_pass::LightObjectPass;
@@ -63,7 +66,8 @@ pub struct WgpuRenderer {
     light_pass: LightObjectPass,
     skybox_pass: SkyboxPass,
     shadow_pass: ShadowPass,
-    water_pass: WaterPass,
+    water_pass: WaterEnvironmentPass,
+    water_surface_pass: WaterSurfacePass,
 }
 
 impl WgpuRenderer {
@@ -122,10 +126,12 @@ impl WgpuRenderer {
         let depth_texture_view = depth_texture.create_default_view();
 
         let shadow_texture = Rc::new(ShadowTexture::allocate_texture(&device));
-        let water_map = Rc::new(WaterMap::allocate_texture(&device));
+        let water_map = Rc::new(WaterEnviornmentMap::allocate_texture(&device));
 
-        let water_pass = WaterPass::new(&device, water_map.clone()).unwrap();
+        let water_pass = WaterEnvironmentPass::new(&device, water_map.clone()).unwrap();
         let shadow_pass = ShadowPass::new(&device, shadow_texture.clone()).unwrap();
+
+        let water_surface_pass = WaterSurfacePass::new(&device).unwrap();
 
         let model_pass = ModelPass::new(
             &device,
@@ -167,6 +173,7 @@ impl WgpuRenderer {
             global_camera_uniforms,
             shadow_pass,
             water_pass,
+            water_surface_pass,
         }
     }
 
@@ -240,19 +247,11 @@ impl WgpuRenderer {
                                 g: 0.0,
                                 b: 0.0,
                                 a: 0.0,
-                                
                             }),
                             store: true,
                         },
                     }],
-                    depth_stencil_attachment: None /*Some(RenderPassDepthStencilAttachmentDescriptor {
-                        attachment: &self.water_pass.water_map_view,
-                        depth_ops: Some(Operations {
-                            load: LoadOp::Clear(1.0),
-                            store: true,
-                        }),
-                        stencil_ops: None,
-                    })*/,
+                    depth_stencil_attachment: None,
                 },
             );
 
@@ -312,6 +311,36 @@ impl WgpuRenderer {
                     },
                 }],
                 depth_stencil_attachment: None,
+            },
+        );
+
+        self.water_surface_pass.update_uniform_data(
+            world,
+            &asset_storage,
+            &self.device,
+            &mut encoder,
+        );
+        self.water_surface_pass.render(
+            &asset_storage,
+            world,
+            &mut encoder,
+            RenderPassDescriptor {
+                color_attachments: &[RenderPassColorAttachmentDescriptor {
+                    attachment: &frame.view,
+                    resolve_target: None,
+                    ops: Operations {
+                        load: LoadOp::Load,
+                        store: true,
+                    },
+                }],
+                depth_stencil_attachment: Some(RenderPassDepthStencilAttachmentDescriptor {
+                    attachment: &self.depth_texture_view,
+                    depth_ops: Some(Operations {
+                        load: LoadOp::Clear(1.0),
+                        store: true,
+                    }),
+                    stencil_ops: None,
+                }),
             },
         );
 

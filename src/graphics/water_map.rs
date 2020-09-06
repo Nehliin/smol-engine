@@ -1,5 +1,5 @@
-use smol_renderer::{Texture, TextureShaderLayout, TextureData};
 use once_cell::sync::OnceCell;
+use smol_renderer::{Texture, TextureData, TextureShaderLayout};
 
 pub const WATERMAP_FORMAT: wgpu::TextureFormat = wgpu::TextureFormat::Bgra8UnormSrgb;
 pub const WATERMAP_SIZE: wgpu::Extent3d = wgpu::Extent3d {
@@ -8,11 +8,10 @@ pub const WATERMAP_SIZE: wgpu::Extent3d = wgpu::Extent3d {
     depth: 1,
 };
 
-
 // used to render water caustics
-pub struct WaterMap;
+pub struct WaterEnviornmentMap;
 
-impl TextureShaderLayout for WaterMap {
+impl TextureShaderLayout for WaterEnviornmentMap {
     const VISIBILITY: wgpu::ShaderStage = wgpu::ShaderStage::FRAGMENT;
 
     fn get_layout(device: &wgpu::Device) -> &'static wgpu::BindGroupLayout {
@@ -41,8 +40,8 @@ impl TextureShaderLayout for WaterMap {
     }
 }
 
-impl Texture for WaterMap {
-    fn allocate_texture(device: &wgpu::Device) -> TextureData<WaterMap> {
+impl Texture for WaterEnviornmentMap {
+    fn allocate_texture(device: &wgpu::Device) -> TextureData<WaterEnviornmentMap> {
         let texture = device.create_texture(&wgpu::TextureDescriptor {
             label: Some("Watermap texture"),
             size: WATERMAP_SIZE,

@@ -20,12 +20,12 @@ use crate::{
         model::{DrawModel, InstanceData},
         point_light::PointLightRaw,
     },
-    graphics::{water_map::WaterMap, PointLight},
+    graphics::{water_map::WaterEnviornmentMap, PointLight},
 };
 
 pub struct ModelPass {
     //todo: maybe solve in another way instead of Rc (weak ptr)?
-    water_map: Rc<TextureData<WaterMap>>,
+    water_map: Rc<TextureData<WaterEnviornmentMap>>,
     shadow_texture: Rc<TextureData<ShadowTexture>>,
     render_node: RenderNode,
 }
@@ -45,7 +45,7 @@ impl ModelPass {
         device: &Device,
         global_uniforms: Vec<Arc<UniformBindGroup>>,
         shadow_texture: Rc<TextureData<ShadowTexture>>,
-        water_map: Rc<TextureData<WaterMap>>,
+        water_map: Rc<TextureData<WaterEnviornmentMap>>,
         color_format: TextureFormat,
     ) -> Result<Self> {
         let render_node = RenderNode::builder()
@@ -65,7 +65,7 @@ impl ModelPass {
             .add_texture::<SimpleTexture>()
             // shadow texture
             .add_texture::<ShadowTexture>()
-            .add_texture::<WaterMap>()
+            .add_texture::<WaterEnviornmentMap>()
             .add_default_color_state_desc(color_format)
             .set_default_depth_stencil_state()
             .set_default_rasterization_state()

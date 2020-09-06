@@ -1,5 +1,6 @@
 use legion::prelude::{Resources, World};
 
+pub mod heightmap;
 pub mod model;
 pub mod pass;
 pub mod point_light;
