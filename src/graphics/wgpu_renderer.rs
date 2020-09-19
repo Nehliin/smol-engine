@@ -9,20 +9,23 @@ use wgpu::{
 };
 
 use super::{
+    model::Model,
     pass::{shadow_pass::ShadowPass, skybox_pass::SkyboxPass},
     point_light::PointLightRaw,
     skybox_texture::SkyboxTexture,
     PointLight,
 };
-use crate::assets::AssetManager;
-use crate::camera::{Camera, CameraUniform};
 use crate::graphics::pass::light_object_pass::LightObjectPass;
 use crate::graphics::pass::model_pass::ModelPass;
 use crate::graphics::shadow_texture::ShadowTexture;
+use crate::{
+    assets::Assets,
+    camera::{Camera, CameraUniform},
+};
 use crate::{components::Transform, graphics::Pass};
-use smol_renderer::{LoadableTexture, Texture, TextureData, UniformBindGroup};
+use smol_renderer::{LoadableTexture, Texture, UniformBindGroup};
 use std::rc::Rc;
-use std::{path::Path, sync::Arc};
+use std::sync::Arc;
 
 pub const DEPTH_FORMAT: wgpu::TextureFormat = wgpu::TextureFormat::Depth32Float;
 fn create_depth_texture(
@@ -201,11 +204,14 @@ impl WgpuRenderer {
                 label: Some("Main CommandEncoder"),
             });
         self.update_camera_uniforms(&camera, &mut encoder);
-        let mut asset_storage = resources.get_mut::<AssetManager>().unwrap();
+        let mut asset_storage = resources.get_mut::<Assets<Model>>().unwrap();
         // TODO: This should be in an update method instead
-        asset_storage.clear_load_queue(&self.device, &self.queue);
+        asset_storage
+            .clear_load_queue(&self.device, &self.queue)
+            .unwrap();
+        drop(asset_storage);
         self.model_pass
-            .update_uniform_data(&world, &asset_storage, &self.device, &mut encoder);
+            .update_uniform_data(&world, &resources, &self.device, &mut encoder);
 
         // move somewhere else this isn't as nice
         self.shadow_pass.update_lights_with_texture_view(world);
@@ -215,7 +221,7 @@ impl WgpuRenderer {
             self.shadow_pass
                 .update_uniforms(&self.device, &raw_light, &mut encoder);
             self.shadow_pass.render(
-                &asset_storage,
+                &resources,
                 world,
                 &mut encoder,
                 RenderPassDescriptor {
@@ -233,7 +239,7 @@ impl WgpuRenderer {
         }
 
         self.skybox_pass.render(
-            &asset_storage,
+            &resources,
             world,
             &mut encoder,
             RenderPassDescriptor {
@@ -255,7 +261,7 @@ impl WgpuRenderer {
         );
 
         self.model_pass.render(
-            &asset_storage,
+            &resources,
             world,
             &mut encoder,
             RenderPassDescriptor {
@@ -278,7 +284,7 @@ impl WgpuRenderer {
             },
         );
         self.light_pass.render(
-            &asset_storage,
+            &resources,
             world,
             &mut encoder,
             RenderPassDescriptor {

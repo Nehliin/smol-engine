@@ -1,7 +1,9 @@
 use super::Pass;
 use crate::{
-    assets::{AssetManager, ModelHandle},
+    assets::Assets,
+    assets::Handle,
     components::Transform,
+    graphics::model::Model,
     graphics::{
         model::{DrawModel, InstanceData, MeshVertex},
         point_light::PointLightRaw,
@@ -123,7 +125,7 @@ impl Pass for ShadowPass {
     fn update_uniform_data(
         &self,
         _world: &World,
-        _asset_manager: &AssetManager,
+        _resources: &Resources,
         _device: &Device,
         _encoder: &mut wgpu::CommandEncoder,
     ) {
@@ -132,23 +134,25 @@ impl Pass for ShadowPass {
 
     fn render<'encoder>(
         &'encoder self,
-        asset_manager: &'encoder AssetManager,
+        resources: &'encoder Resources,
         world: &World,
         encoder: &mut wgpu::CommandEncoder,
         render_pass_descriptor: wgpu::RenderPassDescriptor,
     ) {
+        let asset_storage = resources
+            .get::<Assets<Model>>()
+            .expect("asset not registered");
         let mut runner = self.render_node.runner(encoder, render_pass_descriptor);
-
         let mut offset_map = HashMap::new();
         let query =
-            <(Read<Transform>, Tagged<ModelHandle>)>::query().filter(!component::<PointLight>());
+            <(Read<Transform>, Tagged<Handle<Model>>)>::query().filter(!component::<PointLight>());
         for chunk in query.iter_chunks(world) {
             // This is guaranteed to be the same for each chunk
-            let model = chunk.tag::<ModelHandle>().unwrap();
+            let model = chunk.tag::<Handle<Model>>().unwrap();
             let offset = *offset_map.get(model).unwrap_or(&0);
             let transforms = chunk.components::<Transform>().unwrap();
             offset_map.insert(model.clone(), offset + transforms.len());
-            let model = asset_manager.get_model(model).unwrap();
+            let model = asset_storage.get(model).unwrap();
             runner.draw_untextured(model, offset as u32..(offset + transforms.len()) as u32);
         }
     }
