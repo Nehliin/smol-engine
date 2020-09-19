@@ -4,11 +4,13 @@ use smol_renderer::{
     GpuData, ImmutableVertexData, LoadableTexture, MutableVertexData, RenderNodeRunner,
     SimpleTexture, TextureData, VertexBuffer,
 };
-use std::ops::Range;
 use std::path::Path;
+use std::{ops::Range, path::PathBuf};
 use wgpu::{
     Buffer, BufferAddress, BufferUsage, Device, Queue, VertexAttributeDescriptor, VertexFormat,
 };
+
+use crate::assets::AssetLoader;
 
 const INDEX_BUFFER_SIZE: u64 = 16_000;
 
@@ -237,5 +239,15 @@ impl<'a, 'b> DrawModel<'b> for RenderNodeRunner<'a, 'b> {
             let material = &model.materials[mesh.material];
             self.draw_mesh_instanced(mesh, material, instance_buffer, instances.clone());
         }
+    }
+}
+
+impl AssetLoader for Model {
+    fn load(path: &PathBuf, device: &Device, queue: &Queue) -> Result<Model> {
+        Model::load(device, queue, path)
+    }
+
+    fn extension() -> &'static str {
+        "obj"
     }
 }

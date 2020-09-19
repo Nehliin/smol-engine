@@ -1,7 +1,6 @@
-use crate::assets::AssetManager;
-use crate::camera::Camera;
 use crate::graphics::WgpuRenderer;
 use crate::states::State;
+use crate::{assets::Assets, camera::Camera, graphics::model::Model};
 use glfw::{Action, Glfw, Key, MouseButton, Window, WindowEvent};
 use legion::prelude::*;
 use nalgebra::{Point3, Vector3};
@@ -69,9 +68,9 @@ impl Engine<WgpuRenderer> {
             delta_time: 0.0,
         });
 
-        let asset_manager = AssetManager::new();
+        let model_assets = Assets::<Model>::new();
         let renderer = futures::executor::block_on(WgpuRenderer::new(&window));
-        resources.insert(asset_manager);
+        resources.insert(model_assets);
         let camera = Camera::new(
             Point3::new(0., 0., 3.),
             Vector3::new(0.0, 0.0, -1.0),

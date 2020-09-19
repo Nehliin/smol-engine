@@ -5,10 +5,12 @@ use legion::prelude::*;
 use smol_renderer::{FragmentShader, RenderNode, UniformBindGroup, VertexShader};
 use wgpu::{CommandEncoder, Device, RenderPassDescriptor, TextureFormat};
 
-use crate::assets::{AssetManager, ModelHandle};
-use crate::components::Transform;
-use crate::graphics::model::{DrawModel, InstanceData, MeshVertex};
 use crate::graphics::{Pass, PointLight};
+use crate::{assets::Assets, components::Transform, graphics::model::Model};
+use crate::{
+    assets::Handle,
+    graphics::model::{DrawModel, InstanceData, MeshVertex},
+};
 
 pub struct LightObjectPass {
     render_node: RenderNode,
@@ -45,7 +47,7 @@ impl Pass for LightObjectPass {
     fn update_uniform_data(
         &self,
         _world: &World,
-        _asset_manager: &AssetManager,
+        _resources: &Resources,
         _device: &Device,
         _encoder: &mut CommandEncoder,
     ) {
@@ -54,17 +56,20 @@ impl Pass for LightObjectPass {
 
     fn render<'encoder>(
         &'encoder self,
-        asset_manager: &'encoder AssetManager,
+        resources: &'encoder Resources,
         world: &World,
         encoder: &mut CommandEncoder,
         render_pass_descriptor: RenderPassDescriptor,
     ) {
+        let asset_storage = resources
+            .get::<Assets<Model>>()
+            .expect("asset type not registered");
         let mut runner = self.render_node.runner(encoder, render_pass_descriptor);
         let query =
-            <(Read<Transform>, Tagged<ModelHandle>)>::query().filter(component::<PointLight>());
+            <(Read<Transform>, Tagged<Handle<Model>>)>::query().filter(component::<PointLight>());
         for chunk in query.par_iter_chunks(world) {
-            let model_handle = chunk.tag::<ModelHandle>().unwrap();
-            let model = asset_manager.get_model(model_handle).unwrap();
+            let model_handle = chunk.tag::<Handle<Model>>().unwrap();
+            let model = asset_storage.get(model_handle).unwrap();
             let transforms = chunk.components::<Transform>().unwrap();
             runner.draw_untextured(model, 0..transforms.len() as u32)
         }

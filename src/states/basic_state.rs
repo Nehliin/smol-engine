@@ -1,4 +1,4 @@
-use crate::camera::Camera;
+use crate::{assets::Assets, camera::Camera, graphics::model::Model};
 //use crate::components::Selected;
 use crate::components::Transform;
 use crate::engine::{InputEvent, Time, WINDOW_HEIGHT, WINDOW_WIDTH};
@@ -11,7 +11,6 @@ use nalgebra::{Isometry3, Vector3};
 use std::collections::HashMap;
 
 use super::State;
-use crate::assets::AssetManager;
 use crate::{graphics::PointLight, physics::Physics};
 use nphysics3d::object::BodyStatus;
 
@@ -38,11 +37,11 @@ const CAMERA_SPEED: f32 = 4.5;
 
 impl State for BasicState {
     fn start(&mut self, world: &mut World, resources: &mut Resources) {
-        let mut asset_manager = resources.get_mut::<AssetManager>().unwrap();
-        let suit_handle = asset_manager.load_model("nanosuit/nanosuit.obj").unwrap();
-        let cube_handle = asset_manager.load_model("box/cube.obj").unwrap();
-        let light_box_handle = asset_manager.load_model("light/light_cube.obj").unwrap();
-        drop(asset_manager);
+        let mut model_storage = resources.get_mut::<Assets<Model>>().unwrap();
+        let suit_handle = model_storage.load("nanosuit/nanosuit.obj").unwrap();
+        let cube_handle = model_storage.load("box/cube.obj").unwrap();
+        let light_box_handle = model_storage.load("light/light_cube.obj").unwrap();
+        drop(model_storage);
         let physicis = Physics::new(resources);
         let schedule = Schedule::builder().add_system(physicis.system).build();
 

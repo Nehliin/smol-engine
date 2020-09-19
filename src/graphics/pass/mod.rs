@@ -1,5 +1,4 @@
-use crate::assets::AssetManager;
-use legion::prelude::World;
+use legion::prelude::*;
 use wgpu::Device;
 use wgpu::{CommandEncoder, RenderPassDescriptor};
 
@@ -12,13 +11,13 @@ pub trait Pass {
     fn update_uniform_data(
         &self,
         world: &World,
-        asset_manager: &AssetManager,
+        resources: &Resources,
         device: &Device,
         encoder: &mut CommandEncoder,
     );
     fn render<'encoder>(
         &'encoder self,
-        asset_manager: &'encoder AssetManager,
+        resources: &'encoder Resources,
         world: &World,
         encoder: &mut CommandEncoder,
         render_pass_descriptor: RenderPassDescriptor,

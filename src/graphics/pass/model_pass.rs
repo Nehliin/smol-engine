@@ -8,8 +8,11 @@ use smol_renderer::{
 };
 use wgpu::{CommandEncoder, Device, RenderPassDescriptor, ShaderStage, TextureFormat};
 
-use crate::assets::{AssetManager, ModelHandle};
-use crate::graphics::Pass;
+use crate::{
+    assets::Assets,
+    assets::Handle,
+    graphics::{model::Model, Pass},
+};
 use crate::{
     components::Transform,
     graphics::PointLight,
@@ -109,23 +112,25 @@ impl Pass for ModelPass {
     fn update_uniform_data(
         &self,
         world: &World,
-        asset_manager: &AssetManager,
+        resources: &Resources,
         device: &Device,
         encoder: &mut CommandEncoder,
     ) {
         self.update_lights(device, world, encoder);
-
+        let asset_storage = resources
+            .get::<Assets<Model>>()
+            .expect("Asset not registerd");
         let mut offsets = HashMap::new();
-        let query = <(Read<Transform>, Tagged<ModelHandle>)>::query();
+        let query = <(Read<Transform>, Tagged<Handle<Model>>)>::query();
         for chunk in query.par_iter_chunks(world) {
-            let model = chunk.tag::<ModelHandle>().unwrap();
+            let model = chunk.tag::<Handle<Model>>().unwrap();
             let transforms = chunk.components::<Transform>().unwrap();
             let model_matrices = transforms
                 .iter()
                 .map(|trans| InstanceData::new(trans.get_model_matrix()))
                 .collect::<Vec<InstanceData>>();
             let offset = *offsets.get(model).unwrap_or(&0);
-            let instance_buffer = &asset_manager.get_model(model).unwrap().instance_buffer;
+            let instance_buffer = &asset_storage.get(model).unwrap().instance_buffer;
             instance_buffer.update(device, encoder, &model_matrices);
             offsets.insert(model.clone(), offset + model_matrices.len() as u64);
         }
@@ -133,23 +138,26 @@ impl Pass for ModelPass {
 
     fn render<'encoder>(
         &'encoder self,
-        asset_manager: &'encoder AssetManager,
+        resources: &'encoder Resources,
         world: &World,
         encoder: &mut CommandEncoder,
         render_pass_descriptor: RenderPassDescriptor,
     ) {
+        let asset_storage = resources
+            .get::<Assets<Model>>()
+            .expect("Asset not registerd");
         let mut runner = self.render_node.runner(encoder, render_pass_descriptor);
         runner.set_texture_data(2, &self.shadow_texture);
         let mut offset_map = HashMap::new();
         let query =
-            <(Read<Transform>, Tagged<ModelHandle>)>::query().filter(!component::<PointLight>());
+            <(Read<Transform>, Tagged<Handle<Model>>)>::query().filter(!component::<PointLight>());
         for chunk in query.par_iter_chunks(world) {
             // This is guaranteed to be the same for each chunk
-            let model = chunk.tag::<ModelHandle>().unwrap();
+            let model = chunk.tag::<Handle<Model>>().unwrap();
             let offset = *offset_map.get(model).unwrap_or(&0);
             let transforms = chunk.components::<Transform>().unwrap();
             offset_map.insert(model.clone(), offset + transforms.len());
-            let model = asset_manager.get_model(model).unwrap();
+            let model = asset_storage.get(model).unwrap();
             runner.draw_model_instanced(model, offset as u32..(offset + transforms.len()) as u32);
         }
     }

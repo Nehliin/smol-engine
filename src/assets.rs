@@ -1,73 +1,107 @@
-use crate::graphics::model::Model;
-use anyhow::{anyhow, Result};
-use std::collections::{HashMap, VecDeque};
-use std::ffi::OsString;
-use std::path::{Path, PathBuf};
+use anyhow::Result;
+use std::{
+    collections::{HashMap, VecDeque},
+    marker::PhantomData,
+    sync::atomic::Ordering,
+};
+use std::{
+    fmt::Debug,
+    hash::Hash,
+    path::{Path, PathBuf},
+};
+use std::{hash::Hasher, sync::atomic::AtomicU32};
 use wgpu::{Device, Queue};
-
-#[derive(Clone, Debug, PartialEq, Eq, Hash)]
-pub struct ModelHandle {
-    //TODO use a copy type instead?
-    file: OsString,
+// This derive only works for T: Debug
+#[derive(Debug)]
+pub struct Handle<T: AssetLoader> {
+    id: u32,
+    _marker: PhantomData<T>,
 }
 
-pub struct AssetManager {
-    // FxMap instead?
-    asset_map: HashMap<ModelHandle, Model>,
-    load_queue: VecDeque<PathBuf>,
+/*
+ These needs to be manually implemented to avoid
+ adding the requirement that T implement these
+*/
+impl<T: AssetLoader> Hash for Handle<T> {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        self.id.hash(state);
+    }
 }
 
-impl AssetManager {
-    pub fn new() -> Self {
-        AssetManager {
-            asset_map: HashMap::new(),
-            load_queue: VecDeque::new(),
+impl<T: AssetLoader> PartialEq for Handle<T> {
+    fn eq(&self, other: &Handle<T>) -> bool {
+        self.id == other.id
+    }
+}
+
+impl<T: AssetLoader> Clone for Handle<T> {
+    fn clone(&self) -> Self {
+        Handle {
+            id: self.id,
+            _marker: PhantomData::default(),
+        }
+    }
+}
+
+impl<T: AssetLoader> Eq for Handle<T> {}
+
+static mut CURRENT_ID: AtomicU32 = AtomicU32::new(0);
+// vagely inspired by bevy
+pub trait AssetLoader: Sized {
+    fn load(path: &PathBuf, device: &Device, queue: &Queue) -> Result<Self>;
+    fn extension() -> &'static str;
+}
+
+pub struct Assets<T: AssetLoader> {
+    storage: HashMap<Handle<T>, T>,
+    gpu_load_queue: VecDeque<(Handle<T>, PathBuf)>,
+}
+
+impl<T: AssetLoader> Assets<T> {
+    pub fn new() -> Assets<T> {
+        Assets {
+            storage: HashMap::default(),
+            gpu_load_queue: VecDeque::default(),
         }
     }
 
-    pub fn load_model(&mut self, path: impl AsRef<Path>) -> Result<ModelHandle> {
-        let path_buf = PathBuf::from(path.as_ref());
-        if let Some(file_name) = path_buf.file_name() {
-            let handle = ModelHandle {
-                file: file_name.to_os_string(),
-            };
-            if self.asset_map.contains_key(&handle) {
-                Ok(handle)
-            } else {
-                self.load_queue.push_back(path_buf);
-                Ok(handle)
-            }
-        } else {
-            Err(anyhow!(
-                "The given model path isn't to an file {:?}",
-                path.as_ref()
-            ))
-        }
+    pub fn get(&self, handle: &Handle<T>) -> Option<&T> {
+        self.storage.get(handle)
     }
 
-    pub fn get_model(&self, handle: &ModelHandle) -> Option<&Model> {
-        self.asset_map.get(handle)
+    pub fn load(&mut self, path: impl AsRef<Path>) -> Result<Handle<T>> {
+        let pathbuf = PathBuf::from(path.as_ref());
+
+        assert!(
+            pathbuf.extension().unwrap() == T::extension(),
+            "Unexpected file extension"
+        );
+        let handle = Handle {
+            // Safe because of atomics
+            id: unsafe { CURRENT_ID.fetch_add(1, Ordering::AcqRel) },
+            _marker: PhantomData::default(),
+        };
+        self.gpu_load_queue.push_back((handle.clone(), pathbuf));
+        Ok(handle)
     }
+
     #[inline]
     fn clear_load_queue_impl(
-        load_queue: &VecDeque<PathBuf>,
-        asset_map: &mut HashMap<ModelHandle, Model>,
+        load_queue: &VecDeque<(Handle<T>, PathBuf)>,
+        storage: &mut HashMap<Handle<T>, T>,
         device: &Device,
         queue: &Queue,
-    ) {
-        load_queue.iter().for_each(|path_buf| {
-            let model = Model::load(device, queue, path_buf.as_path()).unwrap();
-            asset_map.insert(
-                ModelHandle {
-                    file: path_buf.file_name().unwrap().to_os_string(),
-                },
-                model,
-            );
-        });
+    ) -> Result<()> {
+        for (handle, path_buf) in load_queue.iter() {
+            let asset = T::load(path_buf, device, queue)?;
+            storage.insert(handle.clone(), asset);
+        }
+        Ok(())
     }
 
-    pub fn clear_load_queue(&mut self, device: &Device, queue: &Queue) {
-        Self::clear_load_queue_impl(&self.load_queue, &mut self.asset_map, device, queue);
-        self.load_queue.clear();
+    pub(crate) fn clear_load_queue(&mut self, device: &Device, queue: &Queue) -> Result<()> {
+        Self::clear_load_queue_impl(&self.gpu_load_queue, &mut self.storage, device, queue)?;
+        self.gpu_load_queue.clear();
+        Ok(())
     }
 }

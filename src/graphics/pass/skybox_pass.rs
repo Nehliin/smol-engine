@@ -1,11 +1,11 @@
-use std::sync::Arc;
-
 use anyhow::Result;
 use legion::prelude::World;
+use legion::prelude::*;
 use smol_renderer::{FragmentShader, RenderNode, TextureData, UniformBindGroup, VertexShader};
+use std::sync::Arc;
 use wgpu::{CommandEncoder, Device, RenderPassDescriptor, TextureFormat};
 
-use crate::{assets::AssetManager, graphics::skybox_texture::SkyboxTexture};
+use crate::graphics::skybox_texture::SkyboxTexture;
 
 use super::Pass;
 
@@ -45,8 +45,8 @@ impl SkyboxPass {
 impl Pass for SkyboxPass {
     fn update_uniform_data(
         &self,
-        _world: &legion::prelude::World,
-        _asset_manager: &crate::assets::AssetManager,
+        _world: &World,
+        _resources: &Resources,
         _device: &Device,
         _encoder: &mut wgpu::CommandEncoder,
     ) {
@@ -55,7 +55,7 @@ impl Pass for SkyboxPass {
 
     fn render<'encoder>(
         &'encoder self,
-        _asset_manager: &'encoder AssetManager,
+        _resources: &'encoder Resources,
         _world: &World,
         encoder: &mut CommandEncoder,
         render_pass_descriptor: RenderPassDescriptor,
