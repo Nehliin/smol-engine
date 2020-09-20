@@ -12,8 +12,6 @@ pub const SHADOW_SIZE: wgpu::Extent3d = wgpu::Extent3d {
 pub struct ShadowTexture;
 
 impl TextureShaderLayout for ShadowTexture {
-    const VISIBILITY: wgpu::ShaderStage = wgpu::ShaderStage::FRAGMENT;
-
     fn get_layout(device: &wgpu::Device) -> &'static wgpu::BindGroupLayout {
         static LAYOUT: OnceCell<wgpu::BindGroupLayout> = OnceCell::new();
         LAYOUT.get_or_init(|| {
@@ -21,7 +19,7 @@ impl TextureShaderLayout for ShadowTexture {
                 bindings: &[
                     wgpu::BindGroupLayoutEntry::new(
                         0,
-                        Self::VISIBILITY,
+                        wgpu::ShaderStage::FRAGMENT,
                         wgpu::BindingType::SampledTexture {
                             multisampled: false,
                             dimension: wgpu::TextureViewDimension::D2Array,
@@ -30,7 +28,7 @@ impl TextureShaderLayout for ShadowTexture {
                     ),
                     wgpu::BindGroupLayoutEntry::new(
                         1,
-                        Self::VISIBILITY,
+                        wgpu::ShaderStage::FRAGMENT,
                         wgpu::BindingType::Sampler { comparison: true },
                     ),
                 ],
