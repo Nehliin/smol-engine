@@ -24,7 +24,7 @@ thiserror = "1.0"
 ncollide3d = "0.24.0"
 nphysics3d = "0.17.0"
 once_cell = "1.4"
-wgpu = {git = "https://github.com/gfx-rs/wgpu-rs.git", features = ["trace"]}
+wgpu = {git = "https://github.com/gfx-rs/wgpu-rs.git", rev = "15f051dd778ed73ad6ea6846578bdd367985366b", features = ["trace"]}
 glsl-to-spirv = "0.1"
 anyhow = "1.0"
 glfw = "0.39"
