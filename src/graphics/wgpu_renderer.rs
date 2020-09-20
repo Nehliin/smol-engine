@@ -316,12 +316,12 @@ impl WgpuRenderer {
 
         self.water_surface_pass.update_uniform_data(
             world,
-            &asset_storage,
+            &resources,
             &self.device,
             &mut encoder,
         );
         self.water_surface_pass.render(
-            &asset_storage,
+            &resources,
             world,
             &mut encoder,
             RenderPassDescriptor {

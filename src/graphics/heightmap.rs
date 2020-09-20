@@ -1,11 +1,12 @@
-use crate::components::Transform;
+use crate::assets::AssetLoader;
 use anyhow::Result;
-use nalgebra::{Matrix4, Vector3};
+use nalgebra::Matrix4;
 use smol_renderer::{
-    GpuData, ImmutableVertexData, LoadableTexture, MutableVertexData, RenderNodeRunner,
-    SimpleTexture, TextureData, VertexBuffer,
+    GpuData, ImmutableVertexData, LoadableTexture, RenderNodeRunner, SimpleTexture, TextureData,
+    VertexBuffer,
 };
 use std::path::Path;
+use std::path::PathBuf;
 use wgpu::{Buffer, BufferUsage, Device, Queue, VertexAttributeDescriptor, VertexFormat};
 
 #[repr(C)]
@@ -39,7 +40,7 @@ pub struct HeightMap {
 #[repr(C)]
 #[derive(GpuData, Debug, Clone, Default)]
 pub struct HeightMapModelMatrix {
-    model_matrix: Matrix4<f32>,
+    pub model_matrix: Matrix4<f32>,
 }
 
 const WIDTH_SEGMENTS: f32 = 512.0;
@@ -108,10 +109,20 @@ impl HeightMap {
         })
     }
 
-    fn render<'a, 'b>(&'b self, runner: &mut RenderNodeRunner<'a, 'b>) {
+    pub fn render<'a, 'b>(&'b self, runner: &mut RenderNodeRunner<'a, 'b>) {
         runner.set_texture_data(0, &self.height_map);
         runner.set_vertex_buffer_data(0, &self.vertex_buffer);
         runner.set_index_buffer(self.index_buffer.slice(..));
         runner.draw_indexed(0..self.number_of_indices, 0, 0..1);
+    }
+}
+
+impl AssetLoader for HeightMap {
+    fn load(path: &PathBuf, device: &Device, queue: &Queue) -> Result<HeightMap> {
+        HeightMap::load(device, queue, path)
+    }
+
+    fn extension() -> &'static str {
+        "png"
     }
 }

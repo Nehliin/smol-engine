@@ -1,4 +1,4 @@
-use crate::graphics::WgpuRenderer;
+use crate::graphics::{heightmap::HeightMap, WgpuRenderer};
 use crate::states::State;
 use crate::{assets::Assets, camera::Camera, graphics::model::Model};
 use glfw::{Action, Glfw, Key, MouseButton, Window, WindowEvent};
@@ -67,10 +67,11 @@ impl Engine<WgpuRenderer> {
             current_time: glfw.get_time() as f32,
             delta_time: 0.0,
         });
-
+        let height_map_assets = Assets::<HeightMap>::new();
         let model_assets = Assets::<Model>::new();
         let renderer = futures::executor::block_on(WgpuRenderer::new(&window));
         resources.insert(model_assets);
+        resources.insert(height_map_assets);
         let camera = Camera::new(
             Point3::new(0., 0., 3.),
             Vector3::new(0.0, 0.0, -1.0),

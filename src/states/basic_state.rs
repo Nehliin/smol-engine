@@ -1,4 +1,6 @@
-use crate::{assets::Assets, camera::Camera, graphics::model::Model};
+use crate::{
+    assets::Assets, camera::Camera, graphics::heightmap::HeightMap, graphics::model::Model,
+};
 //use crate::components::Selected;
 use crate::components::Transform;
 use crate::engine::{InputEvent, Time, WINDOW_HEIGHT, WINDOW_WIDTH};
@@ -11,10 +13,7 @@ use nalgebra::{Isometry3, Vector3};
 use std::collections::HashMap;
 
 use super::State;
-use crate::{
-    graphics::{pass::water_pass::WaterResource, PointLight},
-    physics::Physics,
-};
+use crate::{graphics::PointLight, physics::Physics};
 use nphysics3d::object::BodyStatus;
 
 pub struct BasicState {
@@ -44,13 +43,12 @@ impl State for BasicState {
         let suit_handle = model_storage.load("nanosuit/nanosuit.obj").unwrap();
         let cube_handle = model_storage.load("box/cube.obj").unwrap();
         let light_box_handle = model_storage.load("light/light_cube.obj").unwrap();
+        let mut height_map_storage = resources.get_mut::<Assets<HeightMap>>().unwrap();
+        let height_map_handle = height_map_storage.load("heightmap.png").unwrap();
+        drop(height_map_storage);
         drop(model_storage);
         let physicis = Physics::new(resources);
         let schedule = Schedule::builder().add_system(physicis.system).build();
-
-        let water = WaterResource { level: 3.0 };
-
-        resources.insert(water);
 
         self.schedule = Some(schedule);
 
@@ -60,6 +58,12 @@ impl State for BasicState {
             //  Vector3::new(1.0, 1.0, 0.0),
             // Vector3::new(0.0, 0.0, -3.0),
         ];
+
+        world.insert(
+            (height_map_handle, ()),
+            vec![(Transform::from_position(Vector3::new(0.0, 3.5, 0.0)),)],
+        );
+
         world.insert(
             (light_box_handle, ()),
             light_positions.iter().map(|&position| {

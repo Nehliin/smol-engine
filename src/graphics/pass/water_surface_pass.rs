@@ -1,12 +1,12 @@
-use crate::assets::AssetManager;
-use crate::components::Transform;
-use crate::graphics::heightmap::{HeightMap, HeightMapModelMatrix, HeightMapVertex};
 use crate::graphics::Pass;
+use crate::{
+    assets::Assets,
+    graphics::heightmap::{HeightMap, HeightMapModelMatrix, HeightMapVertex},
+};
+use crate::{assets::Handle, components::Transform};
 use anyhow::Result;
 use legion::prelude::*;
-use smol_renderer::{
-    FragmentShader, RenderNode, SimpleTexture, TextureData, UniformBindGroup, VertexShader,
-};
+use smol_renderer::{FragmentShader, RenderNode, SimpleTexture, UniformBindGroup, VertexShader};
 use wgpu::{CommandEncoder, Device, RenderPassDescriptor, ShaderStage};
 
 // TODO WATER SURFACE PASS
@@ -47,14 +47,15 @@ impl Pass for WaterSurfacePass {
     fn update_uniform_data(
         &self,
         world: &World,
-        _asset_manager: &AssetManager,
+        _resources: &Resources,
         device: &Device,
         encoder: &mut CommandEncoder,
     ) {
-        let query = <(Read<Transform>, Read<HeightMap>)>::query();
-        // Heightmap isn't send + sync....
-        for (transform, _) in query.par_iter(world) {
-            let model_matrix = transform.get_model_matrix();
+        let query = <(Read<Transform>, Tagged<Handle<HeightMap>>)>::query();
+        for (transform, _) in query.iter(world) {
+            let model_matrix = HeightMapModelMatrix {
+                model_matrix: transform.get_model_matrix(),
+            };
             self.render_node
                 .update(device, encoder, 1, &model_matrix)
                 .unwrap();
@@ -63,14 +64,18 @@ impl Pass for WaterSurfacePass {
 
     fn render<'encoder>(
         &'encoder self,
-        asset_manager: &'encoder AssetManager,
+        resources: &'encoder Resources,
         world: &World,
         encoder: &mut CommandEncoder,
         render_pass_descriptor: RenderPassDescriptor,
     ) {
+        let asset_storage = resources
+            .get::<Assets<HeightMap>>()
+            .expect("asset not registered");
         let mut runner = self.render_node.runner(encoder, render_pass_descriptor);
-        let query = <(Read<Transform>, Read<HeightMap>)>::query();
-        for (_, height_map) in query.par_iter(world) {
+        let query = <(Read<Transform>, Tagged<Handle<HeightMap>>)>::query();
+        for (_, handle) in query.iter(world) {
+            let height_map = asset_storage.get(handle).unwrap();
             height_map.render(&mut runner);
         }
     }
