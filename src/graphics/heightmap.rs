@@ -87,7 +87,6 @@ impl HeightMap {
                 indices.push(a);
                 indices.push(b);
                 indices.push(d);
-
                 indices.push(b);
                 indices.push(c);
                 indices.push(d);

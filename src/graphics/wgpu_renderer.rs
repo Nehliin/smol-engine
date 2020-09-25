@@ -9,6 +9,8 @@ use wgpu::{
 };
 
 use super::{
+    heightmap::HeightMap,
+    model::Model,
     pass::{
         shadow_pass::ShadowPass, skybox_pass::SkyboxPass,
         water_environment_pass::WaterEnvironmentPass, water_surface_pass::WaterSurfacePass,
@@ -17,7 +19,7 @@ use super::{
     skybox_texture::SkyboxTexture,
     water_map::WaterEnviornmentMap,
     PointLight,
-model::Model};
+};
 use crate::graphics::pass::light_object_pass::LightObjectPass;
 use crate::graphics::pass::model_pass::ModelPass;
 use crate::graphics::shadow_texture::ShadowTexture;
@@ -131,7 +133,12 @@ impl WgpuRenderer {
         let water_pass = WaterEnvironmentPass::new(&device, water_map.clone()).unwrap();
         let shadow_pass = ShadowPass::new(&device, shadow_texture.clone()).unwrap();
 
-        let water_surface_pass = WaterSurfacePass::new(&device).unwrap();
+        let water_surface_pass = WaterSurfacePass::new(
+            &device,
+            swap_chain_desc.format,
+            vec![Arc::clone(&global_camera_uniforms)],
+        )
+        .unwrap();
 
         let model_pass = ModelPass::new(
             &device,
@@ -192,6 +199,18 @@ impl WgpuRenderer {
             .create_swap_chain(&self.surface, &self.swap_chain_desc);
     }
 
+    fn load_assets(&self, resources: &mut Resources) {
+        let mut model_storage = resources.get_mut::<Assets<Model>>().unwrap();
+        model_storage
+            .clear_load_queue(&self.device, &self.queue)
+            .unwrap();
+
+        let mut height_map_storage = resources.get_mut::<Assets<HeightMap>>().unwrap();
+        height_map_storage
+            .clear_load_queue(&self.device, &self.queue)
+            .unwrap();
+    }
+
     fn update_camera_uniforms(&mut self, camera: &Camera, encoder: &mut CommandEncoder) {
         self.global_camera_uniforms
             .update_buffer_data(
@@ -216,12 +235,10 @@ impl WgpuRenderer {
                 label: Some("Main CommandEncoder"),
             });
         self.update_camera_uniforms(&camera, &mut encoder);
-        let mut asset_storage = resources.get_mut::<Assets<Model>>().unwrap();
-        // TODO: This should be in an update method instead
-        asset_storage
-            .clear_load_queue(&self.device, &self.queue)
-            .unwrap();
-        drop(asset_storage);
+
+        drop(camera);
+        self.load_assets(resources);
+
         self.model_pass
             .update_uniform_data(&world, &resources, &self.device, &mut encoder);
 
@@ -275,23 +292,6 @@ impl WgpuRenderer {
             );
         }
 
-        self.water_pass.render(
-            &resources,
-            world,
-            &mut encoder,
-            RenderPassDescriptor {
-                color_attachments: &[],
-                depth_stencil_attachment: Some(RenderPassDepthStencilAttachmentDescriptor {
-                    attachment: &self.water_pass.water_map_view,
-                    depth_ops: Some(Operations {
-                        load: LoadOp::Clear(1.0),
-                        store: true,
-                    }),
-                    stencil_ops: None,
-                }),
-            },
-        );
-
         self.skybox_pass.render(
             &resources,
             world,
@@ -311,36 +311,6 @@ impl WgpuRenderer {
                     },
                 }],
                 depth_stencil_attachment: None,
-            },
-        );
-
-        self.water_surface_pass.update_uniform_data(
-            world,
-            &resources,
-            &self.device,
-            &mut encoder,
-        );
-        self.water_surface_pass.render(
-            &resources,
-            world,
-            &mut encoder,
-            RenderPassDescriptor {
-                color_attachments: &[RenderPassColorAttachmentDescriptor {
-                    attachment: &frame.view,
-                    resolve_target: None,
-                    ops: Operations {
-                        load: LoadOp::Load,
-                        store: true,
-                    },
-                }],
-                depth_stencil_attachment: Some(RenderPassDepthStencilAttachmentDescriptor {
-                    attachment: &self.depth_texture_view,
-                    depth_ops: Some(Operations {
-                        load: LoadOp::Clear(1.0),
-                        store: true,
-                    }),
-                    stencil_ops: None,
-                }),
             },
         );
 
@@ -367,6 +337,32 @@ impl WgpuRenderer {
                 }),
             },
         );
+        self.water_surface_pass
+            .update_uniform_data(world, &resources, &self.device, &mut encoder);
+        self.water_surface_pass.render(
+            &resources,
+            world,
+            &mut encoder,
+            RenderPassDescriptor {
+                color_attachments: &[RenderPassColorAttachmentDescriptor {
+                    attachment: &frame.view,
+                    resolve_target: None,
+                    ops: Operations {
+                        load: LoadOp::Load,
+                        store: true,
+                    },
+                }],
+                depth_stencil_attachment: Some(RenderPassDepthStencilAttachmentDescriptor {
+                    attachment: &self.depth_texture_view,
+                    depth_ops: Some(Operations {
+                        load: LoadOp::Clear(1.0),
+                        store: true,
+                    }),
+                    stencil_ops: None,
+                }),
+            },
+        );
+
         self.light_pass.render(
             &resources,
             world,

@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use crate::graphics::Pass;
 use crate::{
     assets::Assets,
@@ -7,7 +9,7 @@ use crate::{assets::Handle, components::Transform};
 use anyhow::Result;
 use legion::prelude::*;
 use smol_renderer::{FragmentShader, RenderNode, SimpleTexture, UniformBindGroup, VertexShader};
-use wgpu::{CommandEncoder, Device, RenderPassDescriptor, ShaderStage};
+use wgpu::{CommandEncoder, Device, RenderPassDescriptor, ShaderStage, TextureFormat};
 
 // TODO WATER SURFACE PASS
 // 1. create watersurface pass that from a plane uses a heightmap
@@ -17,7 +19,7 @@ pub struct WaterSurfacePass {
 }
 
 impl WaterSurfacePass {
-    pub fn new(device: &Device) -> Result<WaterSurfacePass> {
+    pub fn new(device: &Device, format: TextureFormat, global_uniforms: Vec<Arc<UniformBindGroup>>) -> Result<WaterSurfacePass> {
         let render_node = RenderNode::builder()
             .add_vertex_buffer::<HeightMapVertex>()
             .set_vertex_shader(VertexShader::new(
@@ -29,6 +31,7 @@ impl WaterSurfacePass {
                 "src/shader_files/fs_watersurface.shader",
             )?)
             .set_default_rasterization_state()
+            .add_default_color_state_desc(format)
             .set_default_depth_stencil_state()
             // height map
             .add_texture::<SimpleTexture>()
@@ -37,6 +40,7 @@ impl WaterSurfacePass {
                     .add_binding::<HeightMapModelMatrix>(ShaderStage::VERTEX)?
                     .build(device),
             )
+            .add_shared_uniform_bind_group(global_uniforms[0].clone())
             .build(device)?;
         Ok(WaterSurfacePass { render_node })
     }
@@ -57,7 +61,7 @@ impl Pass for WaterSurfacePass {
                 model_matrix: transform.get_model_matrix(),
             };
             self.render_node
-                .update(device, encoder, 1, &model_matrix)
+                .update(device, encoder, 0, &model_matrix)
                 .unwrap();
         }
     }
