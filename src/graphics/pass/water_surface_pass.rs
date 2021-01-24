@@ -9,7 +9,7 @@ use crate::{assets::Handle, components::Transform};
 use anyhow::Result;
 use legion::prelude::*;
 use smol_renderer::{FragmentShader, RenderNode, SimpleTexture, UniformBindGroup, VertexShader};
-use wgpu::{CommandEncoder, Device, RenderPassDescriptor, ShaderStage, TextureFormat};
+use wgpu::{CommandEncoder, CullMode, Device, RenderPassDescriptor, ShaderStage, TextureFormat};
 
 // TODO WATER SURFACE PASS
 // 1. create watersurface pass that from a plane uses a heightmap
@@ -19,7 +19,11 @@ pub struct WaterSurfacePass {
 }
 
 impl WaterSurfacePass {
-    pub fn new(device: &Device, format: TextureFormat, global_uniforms: Vec<Arc<UniformBindGroup>>) -> Result<WaterSurfacePass> {
+    pub fn new(
+        device: &Device,
+        format: TextureFormat,
+        global_uniforms: Vec<Arc<UniformBindGroup>>,
+    ) -> Result<WaterSurfacePass> {
         let render_node = RenderNode::builder()
             .add_vertex_buffer::<HeightMapVertex>()
             .set_vertex_shader(VertexShader::new(
@@ -30,7 +34,14 @@ impl WaterSurfacePass {
                 device,
                 "src/shader_files/fs_watersurface.shader",
             )?)
-            .set_default_rasterization_state()
+            .set_rasterization_state(wgpu::RasterizationStateDescriptor {
+                front_face: wgpu::FrontFace::Ccw,
+                cull_mode: CullMode::None,
+                ..Default::default()
+             /*   depth_bias: 0,
+                depth_bias_slope_scale: 0.0,
+                depth_bias_clamp: 0.0,*/
+            })
             .add_default_color_state_desc(format)
             .set_default_depth_stencil_state()
             // height map

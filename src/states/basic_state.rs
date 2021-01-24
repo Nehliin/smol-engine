@@ -58,10 +58,16 @@ impl State for BasicState {
             //  Vector3::new(1.0, 1.0, 0.0),
             // Vector3::new(0.0, 0.0, -3.0),
         ];
-
+        let height_map_transform = Transform::new(
+            Isometry3::new(
+                Vector3::new(0.0, -1.0, -2.0),
+                Vector3::z() * 45.0_f32.to_radians(),
+            ),
+            Vector3::new(1.0, 1.0, 1.0),
+        );
         world.insert(
             (height_map_handle, ()),
-            vec![(Transform::from_position(Vector3::new(0.0, 3.5, 0.0)),)],
+            vec![(height_map_transform,)],
         );
 
         world.insert(

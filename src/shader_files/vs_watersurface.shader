@@ -7,12 +7,12 @@ layout(set = 0, binding = 1) uniform sampler s_water;
 
 layout(location = 0) out vec4 out_pos;
 
-layout(set = 1, binding = 0) uniform HeightMapModelMatrix {
+layout(set = 2, binding = 0) uniform HeightMapModelMatrix {
     mat4 matrix;
 };
 
 
-layout(set=2, binding=0)
+layout(set=1, binding=0)
 uniform Uniforms {
     mat4 view;
     mat4 projection;

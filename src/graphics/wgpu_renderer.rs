@@ -363,7 +363,7 @@ impl WgpuRenderer {
             },
         );
 
-        self.light_pass.render(
+        /*self.light_pass.render(
             &resources,
             world,
             &mut encoder,
@@ -385,7 +385,7 @@ impl WgpuRenderer {
                     stencil_ops: None,
                 }),
             },
-        );
+        );*/
         self.queue.submit(vec![encoder.finish()]);
     }
 }

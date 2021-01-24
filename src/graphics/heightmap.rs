@@ -112,7 +112,7 @@ impl HeightMap {
         runner.set_texture_data(0, &self.height_map);
         runner.set_vertex_buffer_data(0, &self.vertex_buffer);
         runner.set_index_buffer(self.index_buffer.slice(..));
-        runner.draw_indexed(0..self.number_of_indices, 0, 0..1);
+        runner.draw_indexed(0..self.number_of_indices, 0, 0..2);
     }
 }
 
