@@ -1666,7 +1666,7 @@ dependencies = [
 [[package]]
 name = "smol-renderer"
 version = "0.1.0"
-source = "git+https://github.com/Nehliin/smol-renderer.git#3bd1bdb809f0bfecbc6ccd69f6aaecf84763e326"
+source = "git+https://github.com/Nehliin/wgpu-render-node.git#a9bdce7b6b33f85b456c1a1b723f718173f105c3"
 dependencies = [
  "image",
  "once_cell",
@@ -1680,7 +1680,7 @@ dependencies = [
 [[package]]
 name = "smol_renderer_derive"
 version = "0.1.0"
-source = "git+https://github.com/Nehliin/smol-renderer.git#3bd1bdb809f0bfecbc6ccd69f6aaecf84763e326"
+source = "git+https://github.com/Nehliin/wgpu-render-node.git#a9bdce7b6b33f85b456c1a1b723f718173f105c3"
 dependencies = [
  "proc-macro-error",
  "quote 1.0.7",
@@ -2021,7 +2021,7 @@ dependencies = [
 [[package]]
 name = "wgpu"
 version = "0.5.0"
-source = "git+https://github.com/gfx-rs/wgpu-rs.git#15f051dd778ed73ad6ea6846578bdd367985366b"
+source = "git+https://github.com/gfx-rs/wgpu-rs?rev=15f051dd778ed73ad6ea6846578bdd367985366b#15f051dd778ed73ad6ea6846578bdd367985366b"
 dependencies = [
  "arrayvec",
  "env_logger",

@@ -20,7 +20,6 @@ pub struct SkyboxTexture {
 }
 
 impl TextureShaderLayout for SkyboxTexture {
-    const VISIBILITY: ShaderStage = ShaderStage::FRAGMENT;
     fn get_layout(device: &Device) -> &'static BindGroupLayout {
         static LAYOUT: OnceCell<BindGroupLayout> = OnceCell::new();
         LAYOUT.get_or_init(|| {
@@ -28,7 +27,7 @@ impl TextureShaderLayout for SkyboxTexture {
                 bindings: &[
                     BindGroupLayoutEntry::new(
                         0,
-                        Self::VISIBILITY,
+                        ShaderStage::FRAGMENT,
                         BindingType::SampledTexture {
                             multisampled: false,
                             dimension: TextureViewDimension::Cube,
@@ -37,7 +36,7 @@ impl TextureShaderLayout for SkyboxTexture {
                     ),
                     BindGroupLayoutEntry::new(
                         1,
-                        Self::VISIBILITY,
+                        ShaderStage::FRAGMENT,
                         BindingType::Sampler { comparison: false },
                     ),
                 ],
